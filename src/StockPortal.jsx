@@ -381,6 +381,10 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <th rowSpan={2} className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 border-r border-stone-200 align-middle">
                           สี · Shade
                         </th>
+                                      <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-red-700 bg-stone-100 border-r border-stone-200 align-middle">
+                          ฿/kg
+                        </th>
+
                         <th rowSpan={2} className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 border-r-2 border-stone-900 align-middle">
                           รหัสสี · Code
                         </th>
@@ -390,9 +394,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <th colSpan={2} className="text-center py-1.5 px-3 text-xs font-semibold bg-rose-300 text-stone-900 border-r-2 border-stone-900">
                           อยู่โรงย้อม <span className="font-mono text-[10px] opacity-70 ml-1">· At dye-house</span>
                         </th>
-                        <th rowSpan={2} className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 align-middle">
-                          ราคา/กก. · Price/kg
-                        </th>
+                        
                         {role === "customer" && (
                           <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 align-middle">
                             เพิ่ม · Add
@@ -432,6 +434,15 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                               <div className="font-medium text-stone-900">{row.shade}</div>
                               <div className="text-[10px] text-stone-500 font-mono">ratio: {row.ratio || 'ok'}</div>
                             </td>
+                                                        {/* Price column — Gift's red convention */}
+                            <td className="py-2.5 px-3 text-right font-mono tabular border-r border-stone-200">
+                              {row.price_per_kg ? (
+                                <span className="text-base font-bold text-red-700">฿{row.price_per_kg}</span>
+                              ) : (
+                                <span className="text-stone-300">—</span>
+                              )}
+                            </td>
+
                             {/* Code column */}
                             <td className="py-2.5 px-3 font-mono text-xs text-stone-600 border-r-2 border-stone-900">
                               {row.code}
@@ -469,9 +480,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                               )}
                             </td>
                             {/* Price column */}
-                            <td className="py-2.5 px-3 font-mono text-xs text-stone-600">
-                              ฿{row.price_per_kg || 0}/kg
-                            </td>
+                            
                             {/* Add to cart column */}
                             {role === "customer" && (
                               <td className="py-2.5 px-3 text-right">
@@ -508,11 +517,13 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                       <tr className="border-t-2 border-stone-900 bg-stone-100 font-mono text-xs">
                         <td className="py-2.5 px-3 font-semibold border-r border-stone-200">รวม · Total</td>
                         <td className="py-2.5 px-3 border-r-2 border-stone-900"></td>
+                        <td className="py-2.5 px-3 border-r border-stone-200"></td>
+
                         <td className="py-2.5 px-3 text-right font-bold text-base">{readyFabTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold border-r-2 border-stone-900">{readyRibTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50">{dyeFabTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50 border-r-2 border-stone-900">{dyeRibTotal}</td>
-                        <td className="py-2.5 px-3"></td>
+                        
                         {role === "customer" && <td className="py-2.5 px-3"></td>}
                       </tr>
                     </tbody>
