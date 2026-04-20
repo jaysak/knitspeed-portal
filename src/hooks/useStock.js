@@ -11,19 +11,21 @@ export function useStock() {
       setLoading(true)
       setError(null)
 
-      // Fetch all stock items (fabric + rib)
       const { data: stockData, error: stockError } = await supabase
         .from('stock')
         .select('*')
         .order('group_id', { ascending: true })
+        .order('item_type', { ascending: false })  // fabric before rib
         .order('shade', { ascending: true })
 
       if (stockError) throw stockError
 
-      // Group by group_id and pair fabric with rib
       const groupMap = {}
-      
+
       stockData.forEach(item => {
+        // Only fabric rows seed group metadata (rib width is always 32, misleading)
+        if (item.item_type !== 'fabric') return
+
         if (!groupMap[item.group_id]) {
           groupMap[item.group_id] = {
             id: item.group_id,
@@ -34,32 +36,26 @@ export function useStock() {
           }
         }
 
-        // For fabric items, create a row and look for matching rib
-        if (item.item_type === 'fabric') {
-          const ribItem = stockData.find(rib => 
-            rib.item_type === 'rib' && rib.sku === item.rib_sku_ref
-          )
+        const ribItem = stockData.find(rib =>
+          rib.item_type === 'rib' && rib.sku === item.rib_sku_ref
+        )
 
-          groupMap[item.group_id].rows.push({
-            shade: item.shade,
-            gsm: item.price_per_kg?.toString() || '0', // Legacy JSX expects gsm field
-            price_per_kg: item.price_per_kg || 0, // Actual price data
-            code: item.dye_code || item.sku,
-            readyRolls: item.ready_rolls || 0,
-            readyRib: ribItem?.ready_rolls || 0,
-            dyeRolls: item.dye_rolls || 0,
-            dyeRib: ribItem?.dye_rolls || 0,
-            dateIn: item.created_at ? new Date(item.created_at).toLocaleDateString('th-TH') : null,
-            note: item.note,
-            ratio: item.ratio || 'ok'
-          })
-        }
+        groupMap[item.group_id].rows.push({
+          sku: item.sku,                           // NEW: needed for order inserts
+          shade: item.shade,
+          price_per_kg: item.price_per_kg || 0,
+          code: item.dye_code || '—',              // '—' instead of full SKU when no dye code
+          readyRolls: item.ready_rolls || 0,
+          readyRib: ribItem?.ready_rolls || 0,
+          dyeRolls: item.dye_rolls || 0,
+          dyeRib: ribItem?.dye_rolls || 0,
+          dateIn: item.created_at ? new Date(item.created_at).toLocaleDateString('th-TH') : null,
+          note: item.note,
+          ratio: item.ratio || 'ok'
+        })
       })
 
-      // Convert to array format expected by UI
-      const groupsArray = Object.values(groupMap)
-      setGroups(groupsArray)
-
+      setGroups(Object.values(groupMap))
     } catch (err) {
       console.error('Error fetching stock:', err)
       setError(err.message)
@@ -68,14 +64,11 @@ export function useStock() {
     }
   }
 
-  useEffect(() => {
-    fetchStock()
-  }, [])
+  useEffect(() => { fetchStock() }, [])
 
   return { groups, loading, error, refresh: fetchStock }
 }
 
-// Helper functions to map group_id to display strings
 function getGroupTitle(groupId) {
   switch (groupId) {
     case '30cm': return '30CM / เส้นคู่'
