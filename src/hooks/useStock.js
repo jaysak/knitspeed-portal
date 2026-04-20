@@ -15,7 +15,7 @@ export function useStock() {
         .from('stock')
         .select('*')
         .order('group_id', { ascending: true })
-        .order('item_type', { ascending: false })  // fabric before rib
+        .order('item_type', { ascending: false })
         .order('shade', { ascending: true })
 
       if (stockError) throw stockError
@@ -23,7 +23,6 @@ export function useStock() {
       const groupMap = {}
 
       stockData.forEach(item => {
-        // Only fabric rows seed group metadata (rib width is always 32, misleading)
         if (item.item_type !== 'fabric') return
 
         if (!groupMap[item.group_id]) {
@@ -41,10 +40,10 @@ export function useStock() {
         )
 
         groupMap[item.group_id].rows.push({
-          sku: item.sku,                           // NEW: needed for order inserts
+          sku: item.sku,
           shade: item.shade,
           price_per_kg: item.price_per_kg || 0,
-          code: item.dye_code || '—',              // '—' instead of full SKU when no dye code
+          code: item.dye_code || '—',
           readyRolls: item.ready_rolls || 0,
           readyRib: ribItem?.ready_rolls || 0,
           dyeRolls: item.dye_rolls || 0,
