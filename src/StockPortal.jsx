@@ -5,6 +5,7 @@ import {
   ArrowLeft, MapPin, Zap, Send, Scan
 } from "lucide-react";
 import { useStock } from "./hooks/useStock";
+import { supabase } from "./lib/supabase";
 
 // ─────────────────────────────────────────────────────────────
 // MOCK DATA — Orders only (Stock now comes from Supabase)
@@ -601,7 +602,8 @@ function AdminView() {
     try {
       setLoading(true);
       setError(null);
-      const { supabase } = await import('../lib/supabase');
+      //const { supabase } = await import('../lib/supabase'); sofia asked 
+      
       const { data, error: err } = await supabase
         .from('stock')
         .select('*')
@@ -622,7 +624,7 @@ function AdminView() {
 
   const handleSave = async (updated) => {
     try {
-      const { supabase } = await import('../lib/supabase');
+      //const { supabase } = await import('../lib/supabase'); sofia asked
       const { error: err } = await supabase
         .from('stock')
         .update({
