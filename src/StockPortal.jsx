@@ -64,7 +64,7 @@ export default function KnitspeedPortal() {
             <div>
               <div className="flex items-baseline gap-4 mb-1">
                 <h1 className="font-display text-3xl font-bold tracking-tight">Knitspeed / GSC</h1>
-                <span className="text-xs font-mono text-stone-500 uppercase tracking-widest">พอร์ทัลสต๊อกผ้า · v0.4.1</span>
+                <span className="text-xs font-mono text-stone-500 uppercase tracking-widest">พอร์ทัลสต๊อกผ้า · v0.4.2</span>
               </div>
               <p className="text-sm text-stone-600">ระบบเช็คสต๊อกผ้า + ริบ แบบเรียลไทม์ <span className="text-stone-400 font-mono text-xs">· Real-time fabric & rib inventory</span></p>
             </div>
@@ -141,7 +141,7 @@ export default function KnitspeedPortal() {
       <footer className={`border-t border-stone-200 py-6 paper-grain ${role === "customer" && cartCount > 0 && view === "stock" ? "mb-20" : "mt-16"}`}>
         <div className="max-w-[1400px] mx-auto px-8 flex items-center justify-between text-xs font-mono text-stone-500">
           <span>KNITSPEED CO. · GSC TEXTILES · {role === "customer" ? "โหมดอ่านอย่างเดียว" : "โหมดกรอกข้อมูล"}</span>
-          <span className="uppercase tracking-widest">Live Data · Supabase v0.4.1</span>
+          <span className="uppercase tracking-widest">Live Data · Supabase v0.4.2</span>
         </div>
       </footer>
 
@@ -364,12 +364,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <th colSpan={2} className="text-center py-1.5 px-3 text-xs font-semibold bg-rose-300 text-stone-900 border-r-2 border-stone-900">
                           อยู่โรงย้อม <span className="font-mono text-[10px] opacity-70 ml-1">· At dye-house</span>
                         </th>
-
-                        {role === "customer" && (
-                          <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 align-middle">
-                            เพิ่ม · Add
-                          </th>
-                        )}
                       </tr>
                       <tr className="border-b-2 border-stone-900">
                         <th className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-50 bg-stone-700">
@@ -388,9 +382,13 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                     </thead>
                     <tbody>
                       {group.rows.map((row, i) => {
-                        const cartKey = makeCartKey(row.sku, row.shade, row.price_per_kg);
-                        const inCart = cart[cartKey] || 0;
-                        const hasStock = (row.readyRolls || 0) > 0;
+                        const fabricCartKey = makeCartKey(row.sku, row.shade, row.price_per_kg);
+                        const fabricInCart = cart[fabricCartKey] || 0;
+                        const hasFabricStock = (row.readyRolls || 0) > 0;
+
+                        const ribCartKey = row.ribSku ? makeCartKey(row.ribSku, row.shade, row.ribPrice) : null;
+                        const ribInCart = ribCartKey ? (cart[ribCartKey] || 0) : 0;
+                        const hasRibStock = (row.readyRib || 0) > 0 && !!row.ribSku;
 
                         return (
                           <tr
@@ -413,69 +411,64 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                             <td className="py-2.5 px-3 font-mono text-xs text-stone-600 border-r-2 border-stone-900">
                               {row.code}
                             </td>
+
+                            {/* READY FABRIC — inline stepper for customer, plain count for provider */}
                             <td className="py-2.5 px-3 text-right font-mono tabular">
-  {role === "customer" && (row.readyRolls || 0) > 0 ? (
-    <div className="flex items-center gap-1.5 justify-end">
-      <button
-        onClick={() => updateCart(cartKey, -1)}
-        disabled={(cart[cartKey] || 0) === 0}
-        className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-      >−</button>
-      <span className="w-10 text-right tabular">
-        <span className="text-base font-semibold text-stone-900">{row.readyRolls}</span>
-        {(cart[cartKey] || 0) > 0 && (
-          <span className="ml-1 text-[10px] text-amber-700">+{cart[cartKey]}</span>
-        )}
-      </span>
-      <button
-        onClick={() => updateCart(cartKey, 1)}
-        disabled={(cart[cartKey] || 0) >= (row.readyRolls || 0)}
-        className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-      >+</button>
-    </div>
-  ) : (row.readyRolls || 0) > 0 ? (
-    <span className="text-base font-semibold">{row.readyRolls}</span>
-  ) : (
-    <span className="text-stone-300">—</span>
-  )}
-</td>
-<td className="py-2.5 px-3 text-right font-mono tabular border-r-2 border-stone-900">
-  {role === "customer" && (row.readyRib || 0) > 0 && row.ribSku ? (() => {
-    const ribCartKey = makeCartKey(row.ribSku, row.shade, row.ribPrice);
-    const ribInCart = cart[ribCartKey] || 0;
-    return (
-      <div className="flex items-center gap-1.5 justify-end">
-        <button
-          onClick={() => updateCart(ribCartKey, -1)}
-          disabled={ribInCart === 0}
-          className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-        >−</button>
-        <span className="w-10 text-right tabular">
-          <span className="text-stone-700">{row.readyRib}</span>
-          {ribInCart > 0 && (
-            <span className="ml-1 text-[10px] text-amber-700">+{ribInCart}</span>
-          )}
-        </span>
-        <button
-          onClick={() => updateCart(ribCartKey, 1)}
-          disabled={ribInCart >= (row.readyRib || 0)}
-          className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-        >+</button>
-      </div>
-    );
-  })() : (row.readyRib || 0) > 0 ? (
-    <span className="text-stone-700">{row.readyRib}</span>
-  ) : (
-    <span className="text-stone-300">—</span>
-  )}
-</td>
+                              {role === "customer" && hasFabricStock ? (
+                                <div className="flex items-center gap-1.5 justify-end">
+                                  <button
+                                    onClick={() => updateCart(fabricCartKey, -1)}
+                                    disabled={fabricInCart === 0}
+                                    className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+                                  >−</button>
+                                  <span className="min-w-[3rem] text-right tabular">
+                                    <span className="text-base font-semibold text-stone-900">{row.readyRolls}</span>
+                                    {fabricInCart > 0 && (
+                                      <span className="ml-1 text-[10px] text-amber-700 font-bold">+{fabricInCart}</span>
+                                    )}
+                                  </span>
+                                  <button
+                                    onClick={() => updateCart(fabricCartKey, 1)}
+                                    disabled={fabricInCart >= (row.readyRolls || 0)}
+                                    className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+                                  >+</button>
+                                </div>
+                              ) : (row.readyRolls || 0) > 0 ? (
+                                <span className="text-base font-semibold">{row.readyRolls}</span>
+                              ) : (
+                                <span className="text-stone-300">—</span>
+                              )}
+                            </td>
+
+                            {/* READY RIB — inline stepper for customer, plain count for provider */}
                             <td className="py-2.5 px-3 text-right font-mono tabular border-r-2 border-stone-900">
-                              {(row.readyRib || 0) > 0 ? (
+                              {role === "customer" && hasRibStock ? (
+                                <div className="flex items-center gap-1.5 justify-end">
+                                  <button
+                                    onClick={() => updateCart(ribCartKey, -1)}
+                                    disabled={ribInCart === 0}
+                                    className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+                                  >−</button>
+                                  <span className="min-w-[3rem] text-right tabular">
+                                    <span className="text-stone-700">{row.readyRib}</span>
+                                    {ribInCart > 0 && (
+                                      <span className="ml-1 text-[10px] text-amber-700 font-bold">+{ribInCart}</span>
+                                    )}
+                                  </span>
+                                  <button
+                                    onClick={() => updateCart(ribCartKey, 1)}
+                                    disabled={ribInCart >= (row.readyRib || 0)}
+                                    className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+                                  >+</button>
+                                </div>
+                              ) : (row.readyRib || 0) > 0 ? (
                                 <span className="text-stone-700">{row.readyRib}</span>
                               ) : (
                                 <span className="text-stone-300">—</span>
                               )}
                             </td>
+
+                            {/* DYED-LOT FABRIC + RIB — read-only per 04-17 ruling */}
                             <td className="py-2.5 px-3 text-right font-mono tabular bg-rose-50/50">
                               {(row.dyeRolls || 0) > 0 ? (
                                 <span className="text-rose-700 font-semibold">{row.dyeRolls}</span>
@@ -490,34 +483,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                                 <span className="text-stone-300">—</span>
                               )}
                             </td>
-
-                            {role === "customer" && (
-                              <td className="py-2.5 px-3 text-right">
-                                {hasStock ? (
-                                  <div className="flex items-center gap-2 justify-end">
-                                    <button
-                                      onClick={() => updateCart(cartKey, -1)}
-                                      disabled={inCart === 0}
-                                      className="w-7 h-7 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-                                    >
-                                      −
-                                    </button>
-                                    <span className="w-8 text-center font-mono text-xs tabular">
-                                      {inCart > 0 ? inCart : ''}
-                                    </span>
-                                    <button
-                                      onClick={() => updateCart(cartKey, 1)}
-                                      disabled={inCart >= (row.readyRolls || 0)}
-                                      className="w-7 h-7 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-stone-400 font-mono uppercase tracking-widest">หมด</span>
-                                )}
-                              </td>
-                            )}
                           </tr>
                         );
                       })}
@@ -531,8 +496,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <td className="py-2.5 px-3 text-right font-bold border-r-2 border-stone-900">{readyRibTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50">{dyeFabTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50 border-r-2 border-stone-900">{dyeRibTotal}</td>
-
-                        {role === "customer" && <td className="py-2.5 px-3"></td>}
                       </tr>
                     </tbody>
                   </table>
