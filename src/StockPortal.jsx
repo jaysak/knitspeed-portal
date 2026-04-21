@@ -414,12 +414,61 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                               {row.code}
                             </td>
                             <td className="py-2.5 px-3 text-right font-mono tabular">
-                              {(row.readyRolls || 0) > 0 ? (
-                                <span className="text-base font-semibold">{row.readyRolls}</span>
-                              ) : (
-                                <span className="text-stone-300">—</span>
-                              )}
-                            </td>
+  {role === "customer" && (row.readyRolls || 0) > 0 ? (
+    <div className="flex items-center gap-1.5 justify-end">
+      <button
+        onClick={() => updateCart(cartKey, -1)}
+        disabled={(cart[cartKey] || 0) === 0}
+        className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+      >−</button>
+      <span className="w-10 text-right tabular">
+        <span className="text-base font-semibold text-stone-900">{row.readyRolls}</span>
+        {(cart[cartKey] || 0) > 0 && (
+          <span className="ml-1 text-[10px] text-amber-700">+{cart[cartKey]}</span>
+        )}
+      </span>
+      <button
+        onClick={() => updateCart(cartKey, 1)}
+        disabled={(cart[cartKey] || 0) >= (row.readyRolls || 0)}
+        className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+      >+</button>
+    </div>
+  ) : (row.readyRolls || 0) > 0 ? (
+    <span className="text-base font-semibold">{row.readyRolls}</span>
+  ) : (
+    <span className="text-stone-300">—</span>
+  )}
+</td>
+<td className="py-2.5 px-3 text-right font-mono tabular border-r-2 border-stone-900">
+  {role === "customer" && (row.readyRib || 0) > 0 && row.ribSku ? (() => {
+    const ribCartKey = makeCartKey(row.ribSku, row.shade, row.ribPrice);
+    const ribInCart = cart[ribCartKey] || 0;
+    return (
+      <div className="flex items-center gap-1.5 justify-end">
+        <button
+          onClick={() => updateCart(ribCartKey, -1)}
+          disabled={ribInCart === 0}
+          className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+        >−</button>
+        <span className="w-10 text-right tabular">
+          <span className="text-stone-700">{row.readyRib}</span>
+          {ribInCart > 0 && (
+            <span className="ml-1 text-[10px] text-amber-700">+{ribInCart}</span>
+          )}
+        </span>
+        <button
+          onClick={() => updateCart(ribCartKey, 1)}
+          disabled={ribInCart >= (row.readyRib || 0)}
+          className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
+        >+</button>
+      </div>
+    );
+  })() : (row.readyRib || 0) > 0 ? (
+    <span className="text-stone-700">{row.readyRib}</span>
+  ) : (
+    <span className="text-stone-300">—</span>
+  )}
+</td>
                             <td className="py-2.5 px-3 text-right font-mono tabular border-r-2 border-stone-900">
                               {(row.readyRib || 0) > 0 ? (
                                 <span className="text-stone-700">{row.readyRib}</span>
