@@ -1,35 +1,140 @@
-// TEMP: Hardcoded session stub for v0.4.1 build.
-// Replace body of getCurrentSession() with real Supabase Auth lookup when login ships.
+// src/lib/session.js
 //
-// Role switching for testing: append ?role=provider or ?role=customer to URL.
-// Default = customer (Bank/Fern).
+// Session layer for Knitspeed Stock Portal.
+// Builds a unified session object from Supabase auth + profiles + user_roles.
 //
-// customer_id / provider_id must match real rows when those tables enforce FK.
-// Provider uuid is placeholder — Gift's real uuid TBD when provider table exists.
+// Shape:
+//   {
+//     userId:     string | null,
+//     email:      string | null,
+//     roles:      Array<{ role: string, scope_id: string|null }>,
+//     customerId: string | null,
+//     tenantId:   string | null,
+//     loading:    boolean,
+//   }
+//
+// Session B note: this layer EXPOSES the real session but does NOT gate UI.
+// StockPortal still renders for unauthenticated users — temp-open RLS policies
+// on orders/order_items still cover read access. Gating happens in Session C.
 
-const STUB_CUSTOMER = {
-  role: 'customer',
-  customer_id: 'e541b17e-7a83-4fa0-8118-b707bd5ada35',
-  display_name: 'วัยรุ่นสกรีน',
+import { useEffect, useState } from 'react';
+import {
+  getSession,
+  getProfile,
+  getRoles,
+  onAuthStateChange,
+} from './auth';
+
+const EMPTY_SESSION = {
+  userId: null,
+  email: null,
+  roles: [],
+  customerId: null,
+  tenantId: null,
+  loading: true,
 };
 
-const STUB_PROVIDER = {
-  role: 'provider',
-  provider_id: '00000000-0000-0000-0000-000000000001', // placeholder, swap when real
-  display_name: 'Gift (Knitspeed)',
+const UNAUTHED_SESSION = {
+  ...EMPTY_SESSION,
+  loading: false,
 };
 
-const getRoleFromURL = () => {
-  if (typeof window === 'undefined') return null;
-  const params = new URLSearchParams(window.location.search);
-  return params.get('role');
-};
+// In-memory snapshot for non-React callers (e.g. data hooks that need
+// the current customerId without subscribing to React state).
+let _currentSession = EMPTY_SESSION;
 
-export const getCurrentSession = () => {
-  const role = getRoleFromURL();
-  if (role === 'provider') return STUB_PROVIDER;
-  return STUB_CUSTOMER;
-};
+/**
+ * Build the unified session object from a raw Supabase session.
+ * Returns UNAUTHED_SESSION if rawSession is null.
+ */
+async function buildSession(rawSession) {
+  if (!rawSession?.user) return UNAUTHED_SESSION;
 
-export const isProvider = () => getCurrentSession().role === 'provider';
-export const isCustomer = () => getCurrentSession().role === 'customer';
+  const userId = rawSession.user.id;
+  const email = rawSession.user.email ?? null;
+
+  // Fetch profile + roles in parallel.
+  const [profile, roles] = await Promise.all([
+    getProfile(userId),
+    getRoles(userId),
+  ]);
+
+  return {
+    userId,
+    email,
+    roles: roles ?? [],
+    customerId: profile?.customer_id ?? null,
+    tenantId: profile?.tenant_id ?? null,
+    loading: false,
+  };
+}
+
+/**
+ * Snapshot accessor for non-React code paths.
+ * Returns the most recently built session (may be stale by milliseconds
+ * around auth events; React consumers should use useSession instead).
+ */
+export function getCurrentSession() {
+  return _currentSession;
+}
+
+/**
+ * React hook: returns the current session, re-renders on auth changes.
+ *
+ * Usage:
+ *   const session = useSession();
+ *   if (session.loading) return <Spinner />;
+ *   if (!session.userId) return <PublicView />;  // (Session C will use this)
+ *   return <PortalView session={session} />;
+ */
+export function useSession() {
+  const [session, setSession] = useState(_currentSession);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // Initial load.
+    (async () => {
+      const raw = await getSession();
+      const built = await buildSession(raw);
+      if (cancelled) return;
+      _currentSession = built;
+      setSession(built);
+    })();
+
+    // Subscribe to future auth changes.
+    const { unsubscribe } = onAuthStateChange(async (_event, raw) => {
+      const built = await buildSession(raw);
+      if (cancelled) return;
+      _currentSession = built;
+      setSession(built);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  return session;
+}
+
+/**
+ * Convenience helpers for role checks. Mirror the SQL has_role() function
+ * so client-side gating (Session C) and RLS policies stay aligned.
+ */
+export function hasRole(session, roleName) {
+  return (session?.roles ?? []).some((r) => r.role === roleName);
+}
+
+export function isProvider(session) {
+  return hasRole(session, 'provider');
+}
+
+export function isCustomer(session) {
+  return hasRole(session, 'customer');
+}
+
+export function isAdmin(session) {
+  return hasRole(session, 'admin');
+}
