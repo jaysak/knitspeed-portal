@@ -21,13 +21,10 @@ export default function KnitspeedPortal() {
   const [showSendOrder, setShowSendOrder] = useState(false);
   const [orderSent, setOrderSent] = useState(false);
 
-  // Live stock data from Supabase
   const { groups: stockGroups, loading: stockLoading, error: stockError, refresh } = useStock();
 
-  // Filter stock for search
   const filteredGroups = useMemo(() => {
     if (!stockGroups || !search.trim()) return stockGroups || [];
-
     const q = search.toLowerCase();
     return stockGroups.map(group => ({
       ...group,
@@ -61,7 +58,6 @@ export default function KnitspeedPortal() {
         .animate-fade-in { animation: fade-in 0.25s ease-out; }
       `}</style>
 
-      {/* ─── HEADER ─── */}
       <header className="border-b-2 border-stone-900 paper-grain sticky top-0 z-20 bg-stone-50">
         <div className="max-w-[1400px] mx-auto px-8 py-5">
           <div className="flex items-start justify-between gap-8">
@@ -123,7 +119,6 @@ export default function KnitspeedPortal() {
         </div>
       </header>
 
-      {/* ─── MAIN ─── */}
       <main className={`max-w-[1400px] mx-auto px-8 py-8 ${role === "customer" && cartCount > 0 && view === "stock" ? "pb-32" : ""}`}>
         {view === "stock" && (
           <StockView
@@ -143,7 +138,6 @@ export default function KnitspeedPortal() {
         {view === "ocr" && role === "provider" && <OCRView />}
       </main>
 
-      {/* ─── FOOTER ─── */}
       <footer className={`border-t border-stone-200 py-6 paper-grain ${role === "customer" && cartCount > 0 && view === "stock" ? "mb-20" : "mt-16"}`}>
         <div className="max-w-[1400px] mx-auto px-8 flex items-center justify-between text-xs font-mono text-stone-500">
           <span>KNITSPEED CO. · GSC TEXTILES · {role === "customer" ? "โหมดอ่านอย่างเดียว" : "โหมดกรอกข้อมูล"}</span>
@@ -151,7 +145,6 @@ export default function KnitspeedPortal() {
         </div>
       </footer>
 
-      {/* ─── STICKY CART + MODALS ─── */}
       {role === "customer" && cartCount > 0 && view === "stock" && !showSendOrder && (
         <div className="fixed bottom-0 left-0 right-0 bg-stone-900 text-stone-50 border-t-4 border-amber-500 z-30 animate-slide-up">
           <div className="max-w-[1400px] mx-auto px-8 py-4 flex items-center justify-between gap-4">
@@ -210,10 +203,8 @@ export default function KnitspeedPortal() {
   );
 }
 
-// ─── END OF PART 1 — paste PART 2 next ───
-
 // ─────────────────────────────────────────────────────────────
-// STOCK VIEW — LIVE SUPABASE DATA
+// STOCK VIEW
 // ─────────────────────────────────────────────────────────────
 
 function StockView({ role, search, setSearch, groups, loading, error, refresh, cart, setCart }) {
@@ -279,7 +270,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
 
   return (
     <div>
-      {/* ─── KPI STRIP ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-2 border-stone-900 mb-8 bg-white">
         <KPI labelTh="พร้อมส่งทั้งหมด" labelEn="Ready to Ship" value={readyTotal} unit="พับ" />
         <KPI labelTh="อยู่โรงย้อม" labelEn="At Dye-house" value={dyeTotal} unit="พับ" bordered />
@@ -287,7 +277,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
         <KPI labelTh="กำลังมา" labelEn="Incoming" value={incomingCount} unit="รายการ" bordered />
       </div>
 
-      {/* ─── SEARCH ─── */}
       <div className="flex items-center gap-4 mb-6">
         <div className="flex-1 flex items-center gap-3 border-2 border-stone-900 bg-white px-4 py-2.5">
           <Search size={18} strokeWidth={1.5} className="text-stone-500" />
@@ -308,7 +297,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
         </div>
       </div>
 
-      {/* ─── LIVE DATA TABLES ─── */}
       <section className="mb-12">
         <div className="flex items-baseline justify-between mb-3 pb-2 border-b-2 border-stone-900">
           <div>
@@ -509,12 +497,8 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
   );
 }
 
-// ─── END OF PART 2 — paste PART 3 next ───
-
 // ─────────────────────────────────────────────────────────────
 // ORDERS VIEW — LIVE, ROLE-AWARE
-// Customer: sees own orders (RLS scopes via customer_id later; for now, all visible)
-// Provider (Gift): sees all Sales Orders, newest first
 // ─────────────────────────────────────────────────────────────
 
 function OrdersView({ role }) {
@@ -591,7 +575,7 @@ function OrderCard({ order, role }) {
     order.status === "completed" || order.status === "shipped" ? "bg-emerald-500" :
     order.status === "partial" || order.status === "confirmed" ? "bg-amber-500" :
     order.status === "cancelled" ? "bg-stone-400" :
-    "bg-red-500"; // pending
+    "bg-red-500";
 
   const statusLabel =
     order.status === "pending"   ? "รอดำเนินการ" :
@@ -604,7 +588,6 @@ function OrderCard({ order, role }) {
 
   return (
     <div className="border-2 border-stone-900 bg-white">
-      {/* Header bar */}
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full bg-stone-900 text-stone-50 px-4 py-2.5 flex items-baseline justify-between hover:bg-stone-800 transition text-left"
@@ -631,10 +614,8 @@ function OrderCard({ order, role }) {
         </div>
       </button>
 
-      {/* Body */}
       {expanded && (
         <div className="p-4">
-          {/* Meta strip */}
           <div className="flex items-center gap-6 mb-3 text-xs font-mono text-stone-600 uppercase tracking-widest">
             <span className="flex items-center gap-1.5">
               <MapPin size={12} strokeWidth={1.5} />
@@ -643,7 +624,6 @@ function OrderCard({ order, role }) {
             <span>{order.total_rolls} พับรวม · {order.items.length} รายการ</span>
           </div>
 
-          {/* Notes (if any) */}
           {order.notes && (
             <div className="mb-3 p-2 bg-stone-50 border-l-2 border-amber-500 text-xs text-stone-700">
               <span className="font-mono uppercase tracking-widest text-stone-500">หมายเหตุ · </span>
@@ -651,13 +631,12 @@ function OrderCard({ order, role }) {
             </div>
           )}
 
-          {/* Line items */}
           <div className="grid gap-1.5">
             {order.items.map(item => {
               const itemDot =
                 item.status === "ready" || item.status === "shipped" ? "bg-emerald-600" :
                 item.status === "partial" ? "bg-amber-500" :
-                "bg-red-700"; // waiting
+                "bg-red-700";
 
               return (
                 <div key={item.id} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
@@ -690,7 +669,7 @@ function OrderCard({ order, role }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ADMIN VIEW (unchanged)
+// ADMIN VIEW
 // ─────────────────────────────────────────────────────────────
 
 function AdminView() {
@@ -1002,7 +981,7 @@ function StockEditModal({ row, onSave, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// OCR VIEW (unchanged, parked)
+// OCR VIEW (parked)
 // ─────────────────────────────────────────────────────────────
 
 function OCRView() {
@@ -1172,5 +1151,3 @@ function SendOrderModal({ cart, setCart, onClose, onSent }) {
     </div>
   );
 }
-
-// ─── END OF FILE ───
