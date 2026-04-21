@@ -8,13 +8,14 @@ import { useStock } from "./hooks/useStock";
 import { supabase } from "./lib/supabase";
 import { useCartSubmit, makeCartKey, parseCartKey } from "./hooks/useCart";
 import { useSalesOrders } from "./hooks/useSalesOrders";
+import UserMenu from "./components/UserMenu";
 
 // ─────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 
-export default function KnitspeedPortal() {
-  const [role, setRole] = useState("customer");
+export default function KnitspeedPortal({ session }) {
+  const role = session?.roles?.some(r => r.role === 'provider') ? 'provider' : 'customer';
   const [view, setView] = useState("stock");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState({});
@@ -69,27 +70,7 @@ export default function KnitspeedPortal() {
               <p className="text-sm text-stone-600">ระบบเช็คสต๊อกผ้า + ริบ แบบเรียลไทม์ <span className="text-stone-400 font-mono text-xs">· Real-time fabric & rib inventory</span></p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-stone-500 uppercase tracking-wider mr-1 hidden md:inline">เข้าใช้งานในฐานะ</span>
-              <button
-                onClick={() => { setRole("customer"); setView("stock"); }}
-                className={`px-4 py-2 text-sm font-medium border-2 transition-all ${role === "customer" ? "bg-stone-900 text-stone-50 border-stone-900" : "bg-transparent text-stone-600 border-stone-300 hover:border-stone-900"}`}
-              >
-                <div className="text-left">
-                  <div className="text-[10px] uppercase tracking-widest opacity-60">ลูกค้าพรีเมียม · Read</div>
-                  <div>แบงค์ / Fern</div>
-                </div>
-              </button>
-              <button
-                onClick={() => { setRole("provider"); setView("stock"); }}
-                className={`px-4 py-2 text-sm font-medium border-2 transition-all ${role === "provider" ? "bg-amber-700 text-stone-50 border-amber-700" : "bg-transparent text-stone-600 border-stone-300 hover:border-amber-700"}`}
-              >
-                <div className="text-left">
-                  <div className="text-[10px] uppercase tracking-widest opacity-60">ผู้ให้ข้อมูล · Edit</div>
-                  <div>Gift · Knitspeed</div>
-                </div>
-              </button>
-            </div>
+            <UserMenu session={session} />
           </div>
 
           <nav className="flex gap-6 mt-5 -mb-[2px]">
