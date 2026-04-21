@@ -333,7 +333,7 @@ export default function KnitspeedPortal() {
             <Check size={20} strokeWidth={2.5} />
             <div>
               <div className="font-semibold">ส่งคำสั่งซื้อเรียบร้อย · Order sent to Gift</div>
-              <div className="text-xs text-emerald-100 font-mono">ORD-690417-NEW</div>
+              <div className="text-xs text-emerald-100 font-mono">{orderSent}</div>
             </div>
           </div>
         </div>
