@@ -196,19 +196,137 @@ export default function KnitspeedPortal() {
       )}
 
       {showSendOrder && (
-        <SendOrderModal
-          cart={cart}
-          setCart={setCart}
-          onClose={() => setShowSendOrder(false)}
-          onSent={() => {
-            setOrderSent(true);
-            setShowSendOrder(false);
-            setCart({});
-            setTimeout(() => setOrderSent(false), 4000);
-          }}
-        />
-      )}
+        function SendOrderModal({ cart, setCart, onClose, onSent }) {
+  const [destination, setDestination] = useState("");
+  const [note, setNote] = useState("");
+  const [urgency, setUrgency] = useState("normal");
+  const { submit, submitting, submitError } = useCartSubmit();
 
+  const cartItems = Object.keys(cart).filter(k => cart[k] > 0);
+  const totalRolls = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
+
+  const handleSend = async () => {
+    try {
+      const orderRef = await submit({ cart, destination, urgency, notes: note });
+      onSent(orderRef);
+    } catch (err) {
+      // submitError shown inline, modal stays open
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white border-4 border-stone-900 max-w-2xl w-full max-h-[90vh] overflow-auto animate-slide-up">
+        <div className="bg-stone-900 text-stone-50 p-4 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold">ตรวจสอบคำสั่งซื้อ · Review Order</h3>
+          <button onClick={onClose} disabled={submitting} className="text-stone-400 hover:text-stone-50 disabled:opacity-50">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="space-y-4 mb-6">
+            {cartItems.map(key => {
+              const { sku, shade, price } = parseCartKey(key);
+              const qty = cart[key];
+              return (
+                <div key={key} className="flex items-center justify-between py-2 border-b border-stone-200">
+                  <div>
+                    <span className="font-medium">{shade}</span>
+                    <span className="ml-2 text-xs text-stone-500 font-mono">{sku}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono font-bold">{qty} พับ</div>
+                    {price ? <div className="text-xs text-stone-500">฿{price}/kg</div> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">จุดหมาย · Destination</label>
+            <select
+              value={destination}
+              onChange={e => setDestination(e.target.value)}
+              className="w-full border-2 border-stone-900 p-2 text-sm"
+              disabled={submitting}
+            >
+              <option value="">เลือกจุดหมาย</option>
+              <option value="คลอง 4">คลอง 4</option>
+              <option value="โรงงาน">โรงงาน</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">ความเร่งด่วน · Urgency</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUrgency("normal")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "normal" ? "bg-stone-900 text-stone-50 border-stone-900" : "border-stone-300 hover:border-stone-900"}`}
+              >
+                ปกติ · Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setUrgency("urgent")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "urgent" ? "bg-amber-700 text-stone-50 border-amber-700" : "border-stone-300 hover:border-amber-700"}`}
+              >
+                เร่งด่วน · Urgent
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">หมายเหตุ · Note (ถ้ามี)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="เช่น ขอส่งก่อน 15.00 น."
+              className="w-full border-2 border-stone-900 p-3 text-sm h-20"
+              disabled={submitting}
+            />
+          </div>
+
+          {submitError && (
+            <div className="mb-4 border-2 border-red-700 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertTriangle size={18} strokeWidth={1.5} className="shrink-0 mt-0.5 text-red-700" />
+              <div>
+                <div className="font-semibold">ส่งคำสั่งซื้อไม่สำเร็จ</div>
+                <div className="font-mono text-xs mt-1">{submitError}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-3 border-2 border-stone-900 text-stone-900 font-semibold hover:bg-stone-900 hover:text-stone-50 transition disabled:opacity-50"
+            >
+              แก้ไข
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={!destination || submitting}
+              className="flex-1 py-3 bg-stone-900 text-stone-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 transition flex items-center justify-center gap-2"
+            >
+              {submitting ? (<><Loader size={16} className="animate-spin" /> กำลังส่ง</>) : (<>ส่งคำสั่งซื้อ<Send size={16} /></>)}
+            </button>
+          </div>
+
+          <div className="mt-4 text-center text-xs text-stone-500 font-mono">
+            รวม {totalRolls} พับ · {cartItems.length} รายการ
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
       {orderSent && (
         <div className="fixed bottom-8 right-8 z-50 bg-emerald-700 text-white px-6 py-4 border-2 border-emerald-900 animate-slide-up">
           <div className="flex items-center gap-3">
