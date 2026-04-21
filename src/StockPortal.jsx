@@ -510,3 +510,667 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
 }
 
 // ─── END OF PART 2 — paste PART 3 next ───
+
+// ─────────────────────────────────────────────────────────────
+// ORDERS VIEW — LIVE, ROLE-AWARE
+// Customer: sees own orders (RLS scopes via customer_id later; for now, all visible)
+// Provider (Gift): sees all Sales Orders, newest first
+// ─────────────────────────────────────────────────────────────
+
+function OrdersView({ role }) {
+  const { orders, loading, error, refresh } = useSalesOrders();
+
+  const titleTh = role === "provider" ? "ใบสั่งขายเข้ามา" : "คำสั่งซื้อของคุณ";
+  const titleEn = role === "provider" ? "Sales Orders Inbox" : "Your Orders";
+  const subEn   = role === "provider"
+    ? "Live from Supabase · Newest first · Fulfillment offline (LINE/phone)"
+    : "Live from Supabase · Newest first";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="text-center">
+          <Loader size={24} className="mx-auto mb-4 animate-spin text-stone-400" />
+          <div className="text-stone-500 mb-2">กำลังโหลดคำสั่งซื้อ...</div>
+          <div className="text-xs font-mono text-stone-400">Loading sales orders</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border-2 border-red-700 bg-red-50 p-8 text-center">
+        <AlertTriangle size={32} className="mx-auto mb-4 text-red-700" />
+        <div className="text-red-900 font-semibold mb-2">โหลดคำสั่งซื้อไม่สำเร็จ</div>
+        <div className="text-red-700 text-sm mb-4">{error}</div>
+        <button
+          onClick={refresh}
+          className="px-4 py-2 bg-red-700 text-white text-sm font-medium hover:bg-red-800 transition"
+        >
+          ลองใหม่ · Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-6 pb-3 border-b-2 border-stone-900">
+        <div>
+          <h2 className="font-display text-xl font-bold">{titleTh} · {titleEn}</h2>
+          <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">{subEn}</p>
+        </div>
+        <button
+          onClick={refresh}
+          className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
+        >
+          รีเฟรช · Refresh
+        </button>
+      </div>
+
+      {(!orders || orders.length === 0) ? (
+        <div className="text-center py-16 text-stone-500">
+          <FileText size={32} className="mx-auto mb-4 text-stone-300" />
+          <div>ยังไม่มีคำสั่งซื้อ</div>
+          <div className="text-xs font-mono text-stone-400 mt-1">No orders yet</div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map(order => <OrderCard key={order.id} order={order} role={role} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderCard({ order, role }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const statusColor =
+    order.status === "completed" || order.status === "shipped" ? "bg-emerald-500" :
+    order.status === "partial" || order.status === "confirmed" ? "bg-amber-500" :
+    order.status === "cancelled" ? "bg-stone-400" :
+    "bg-red-500"; // pending
+
+  const statusLabel =
+    order.status === "pending"   ? "รอดำเนินการ" :
+    order.status === "confirmed" ? "ยืนยันแล้ว" :
+    order.status === "partial"   ? "บางส่วน" :
+    order.status === "shipped"   ? "ส่งแล้ว" :
+    order.status === "completed" ? "เสร็จสิ้น" :
+    order.status === "cancelled" ? "ยกเลิก" :
+    order.status;
+
+  return (
+    <div className="border-2 border-stone-900 bg-white">
+      {/* Header bar */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full bg-stone-900 text-stone-50 px-4 py-2.5 flex items-baseline justify-between hover:bg-stone-800 transition text-left"
+      >
+        <div className="flex items-baseline gap-4 flex-wrap">
+          <span className="font-mono text-sm font-bold">{order.order_ref}</span>
+          <span className="text-xs text-stone-400">{order.created_display}</span>
+          {role === "provider" && (
+            <span className="text-sm">{order.customer_name}</span>
+          )}
+          {order.urgency === "urgent" && (
+            <span className="text-[10px] font-mono uppercase tracking-widest bg-amber-700 text-stone-50 px-2 py-0.5">
+              ⚡ เร่งด่วน · Urgent
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className={`w-2 h-2 ${statusColor}`}></div>
+          <span className="text-xs font-mono uppercase tracking-widest">{statusLabel}</span>
+          <ChevronRight
+            size={14}
+            className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+          />
+        </div>
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div className="p-4">
+          {/* Meta strip */}
+          <div className="flex items-center gap-6 mb-3 text-xs font-mono text-stone-600 uppercase tracking-widest">
+            <span className="flex items-center gap-1.5">
+              <MapPin size={12} strokeWidth={1.5} />
+              {order.destination || "—"}
+            </span>
+            <span>{order.total_rolls} พับรวม · {order.items.length} รายการ</span>
+          </div>
+
+          {/* Notes (if any) */}
+          {order.notes && (
+            <div className="mb-3 p-2 bg-stone-50 border-l-2 border-amber-500 text-xs text-stone-700">
+              <span className="font-mono uppercase tracking-widest text-stone-500">หมายเหตุ · </span>
+              {order.notes}
+            </div>
+          )}
+
+          {/* Line items */}
+          <div className="grid gap-1.5">
+            {order.items.map(item => {
+              const itemDot =
+                item.status === "ready" || item.status === "shipped" ? "bg-emerald-600" :
+                item.status === "partial" ? "bg-amber-500" :
+                "bg-red-700"; // waiting
+
+              return (
+                <div key={item.id} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-3 h-3 shrink-0 ${itemDot}`}></div>
+                    <div className="min-w-0">
+                      <span className="font-medium">{item.shade}</span>
+                      <span className="ml-2 text-xs text-stone-500 font-mono">{item.sku}</span>
+                      {item.note && (
+                        <div className="text-xs text-stone-500">({item.note})</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <div className="font-mono text-sm tabular">
+                      {item.rolls} <span className="text-stone-400 text-xs">พับ</span>
+                    </div>
+                    {item.price_per_kg ? (
+                      <div className="text-[10px] text-stone-500 font-mono">฿{item.price_per_kg}/kg</div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN VIEW (unchanged)
+// ─────────────────────────────────────────────────────────────
+
+function AdminView() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [saveToast, setSaveToast] = useState(null);
+
+  const fetchRows = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: err } = await supabase
+        .from('stock')
+        .select('*')
+        .order('group_id', { ascending: true })
+        .order('item_type', { ascending: true })
+        .order('shade', { ascending: true });
+      if (err) throw err;
+      setRows(data || []);
+    } catch (err) {
+      console.error('Error fetching stock:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchRows(); }, []);
+
+  const handleSave = async (updated) => {
+    try {
+      const { error: err } = await supabase
+        .from('stock')
+        .update({
+          ready_rolls: updated.ready_rolls,
+          ready_kg: updated.ready_kg,
+          dye_rolls: updated.dye_rolls,
+          dye_kg: updated.dye_kg,
+          eta_date: updated.eta_date || null,
+          note: updated.note || null,
+          ratio: updated.ratio,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', updated.id);
+      if (err) throw err;
+      setSaveToast('success');
+      setEditing(null);
+      await fetchRows();
+      setTimeout(() => setSaveToast(null), 3000);
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaveToast(`error: ${err.message}`);
+      setTimeout(() => setSaveToast(null), 5000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader size={24} className="animate-spin text-stone-400" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border-2 border-red-700 bg-red-50 p-8 text-center">
+        <AlertTriangle size={32} className="mx-auto mb-4 text-red-700" />
+        <div className="text-red-900 font-semibold mb-2">โหลดไม่สำเร็จ</div>
+        <div className="text-red-700 text-sm mb-4">{error}</div>
+        <button onClick={fetchRows} className="px-4 py-2 bg-red-700 text-white text-sm">ลองใหม่</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-6 pb-3 border-b-2 border-stone-900">
+        <div>
+          <h2 className="font-display text-xl font-bold">กรอกข้อมูลสต๊อก · Stock Data Entry</h2>
+          <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">
+            Click a row to edit · {rows.length} items
+          </p>
+        </div>
+        <button
+          onClick={fetchRows}
+          className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
+        >
+          รีเฟรช · Refresh
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="text-center py-16 text-stone-500">
+          <Package size={32} className="mx-auto mb-4 text-stone-300" />
+          <div>ไม่มีข้อมูลสต๊อก · No stock rows yet</div>
+          <div className="text-xs font-mono text-stone-400 mt-1">Add rows via SQL or v1.1 form (not built)</div>
+        </div>
+      ) : (
+        <div className="border-2 border-stone-900 bg-white overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b-2 border-stone-900 bg-stone-100">
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">Group</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">Type</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">SKU</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">Shade</th>
+                <th className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">พร้อมส่ง (พับ/kg)</th>
+                <th className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">โรงย้อม (พับ/kg)</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">ETA</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">Ratio</th>
+                <th className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600">Note</th>
+                <th className="w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr
+                  key={r.id}
+                  onClick={() => setEditing(r)}
+                  className="border-t border-stone-200 hover:bg-amber-50 cursor-pointer transition"
+                >
+                  <td className="py-2 px-3 font-mono text-xs">{r.group_id}</td>
+                  <td className="py-2 px-3 text-xs">{r.item_type}</td>
+                  <td className="py-2 px-3 font-mono text-xs">{r.sku}</td>
+                  <td className="py-2 px-3">{r.shade}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular">{r.ready_rolls || 0} / {r.ready_kg || 0}</td>
+                  <td className="py-2 px-3 text-right font-mono tabular text-rose-700">{r.dye_rolls || 0} / {r.dye_kg || 0}</td>
+                  <td className="py-2 px-3 font-mono text-xs">{r.eta_date || '—'}</td>
+                  <td className="py-2 px-3 text-xs">
+                    <span className={`font-mono px-1.5 py-0.5 ${
+                      r.ratio === 'ok' ? 'bg-emerald-100 text-emerald-800' :
+                      r.ratio === 'short' ? 'bg-amber-100 text-amber-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>{r.ratio}</span>
+                  </td>
+                  <td className="py-2 px-3 text-xs text-stone-500 max-w-[200px] truncate">{r.note || '—'}</td>
+                  <td className="py-2 px-3"><Edit3 size={14} className="text-stone-400" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <StockEditModal
+          row={editing}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {saveToast && (
+        <div className={`fixed bottom-8 right-8 z-50 px-6 py-4 border-2 animate-slide-up ${
+          saveToast === 'success'
+            ? 'bg-emerald-700 text-white border-emerald-900'
+            : 'bg-red-700 text-white border-red-900'
+        }`}>
+          <div className="flex items-center gap-3">
+            {saveToast === 'success' ? <Check size={20} /> : <AlertTriangle size={20} />}
+            <div className="font-semibold">
+              {saveToast === 'success' ? 'บันทึกแล้ว · Saved' : saveToast}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StockEditModal({ row, onSave, onClose }) {
+  const [form, setForm] = useState({
+    id: row.id,
+    ready_rolls: row.ready_rolls || 0,
+    ready_kg: row.ready_kg || 0,
+    dye_rolls: row.dye_rolls || 0,
+    dye_kg: row.dye_kg || 0,
+    eta_date: row.eta_date || '',
+    note: row.note || '',
+    ratio: row.ratio || 'ok',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white border-4 border-stone-900 max-w-lg w-full max-h-[90vh] overflow-auto animate-slide-up">
+        <div className="bg-stone-900 text-stone-50 p-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-lg font-bold">แก้ไขสต๊อก · Edit Stock</h3>
+            <div className="text-xs font-mono text-stone-400 mt-1">{row.sku} · {row.shade}</div>
+          </div>
+          <button onClick={onClose} disabled={saving} className="text-stone-400 hover:text-stone-50 disabled:opacity-50">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">พร้อมส่ง (พับ)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.ready_rolls}
+                onChange={e => setForm({ ...form, ready_rolls: parseInt(e.target.value) || 0 })}
+                className="w-full border-2 border-stone-900 p-2 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">พร้อมส่ง (kg)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.ready_kg}
+                onChange={e => setForm({ ...form, ready_kg: parseFloat(e.target.value) || 0 })}
+                className="w-full border-2 border-stone-900 p-2 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">โรงย้อม (พับ)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.dye_rolls}
+                onChange={e => setForm({ ...form, dye_rolls: parseInt(e.target.value) || 0 })}
+                className="w-full border-2 border-stone-900 p-2 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">โรงย้อม (kg)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.dye_kg}
+                onChange={e => setForm({ ...form, dye_kg: parseFloat(e.target.value) || 0 })}
+                className="w-full border-2 border-stone-900 p-2 font-mono"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">ETA (วันที่คาดส่งจากโรงย้อม)</label>
+            <input
+              type="date"
+              value={form.eta_date}
+              onChange={e => setForm({ ...form, eta_date: e.target.value })}
+              className="w-full border-2 border-stone-900 p-2 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">สถานะ · Ratio</label>
+            <select
+              value={form.ratio}
+              onChange={e => setForm({ ...form, ratio: e.target.value })}
+              className="w-full border-2 border-stone-900 p-2 font-mono"
+            >
+              <option value="ok">ok · ปกติ</option>
+              <option value="short">short · ริบขาด</option>
+              <option value="out">out · หมด</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono uppercase tracking-widest text-stone-600 mb-1">หมายเหตุ · Note</label>
+            <textarea
+              value={form.note}
+              onChange={e => setForm({ ...form, note: e.target.value })}
+              placeholder="เช่น ต้องย้อมเพิ่ม 1 พับ"
+              className="w-full border-2 border-stone-900 p-2 h-20 text-sm"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 py-3 border-2 border-stone-900 font-semibold hover:bg-stone-900 hover:text-stone-50 transition disabled:opacity-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="flex-1 py-3 bg-stone-900 text-stone-50 font-semibold hover:bg-stone-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? <><Loader size={16} className="animate-spin" /> กำลังบันทึก</> : <><Check size={16} /> บันทึก</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// OCR VIEW (unchanged, parked)
+// ─────────────────────────────────────────────────────────────
+
+function OCRView() {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-6 pb-3 border-b-2 border-stone-900">
+        <div>
+          <h2 className="font-display text-xl font-bold">สแกนบิล · OCR Invoice</h2>
+          <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">
+            Provider only · OCR integration parked
+          </p>
+        </div>
+      </div>
+
+      <div className="border-2 border-stone-900 bg-stone-50 p-8 text-center">
+        <Camera size={32} className="mx-auto mb-4 text-stone-600" />
+        <div className="text-stone-900 font-semibold mb-2">OCR view - parked until production integration</div>
+        <div className="text-stone-700 text-sm">Invoice scanning will be added in Phase 2</div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+
+function KPI({ labelTh, labelEn, value, unit, bordered = false, alert = false }) {
+  return (
+    <div className={`p-4 ${bordered ? "border-l-2 border-stone-900" : ""} ${alert ? "bg-red-50" : ""}`}>
+      <div className="text-[10px] uppercase tracking-widest font-mono text-stone-500 mb-1">{labelTh} · {labelEn}</div>
+      <div className={`text-xl font-bold tabular font-mono ${alert ? "text-red-700" : "text-stone-900"}`}>
+        {value} <span className="text-sm text-stone-500 font-normal">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function SendOrderModal({ cart, setCart, onClose, onSent }) {
+  const [destination, setDestination] = useState("");
+  const [note, setNote] = useState("");
+  const [urgency, setUrgency] = useState("normal");
+  const { submit, submitting, submitError } = useCartSubmit();
+
+  const cartItems = Object.keys(cart).filter(k => cart[k] > 0);
+  const totalRolls = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
+
+  const handleSend = async () => {
+    try {
+      const orderRef = await submit({ cart, destination, urgency, notes: note });
+      onSent(orderRef);
+    } catch (err) {
+      // submitError shown inline, modal stays open
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white border-4 border-stone-900 max-w-2xl w-full max-h-[90vh] overflow-auto animate-slide-up">
+        <div className="bg-stone-900 text-stone-50 p-4 flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold">ตรวจสอบคำสั่งซื้อ · Review Order</h3>
+          <button onClick={onClose} disabled={submitting} className="text-stone-400 hover:text-stone-50 disabled:opacity-50">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="space-y-4 mb-6">
+            {cartItems.map(key => {
+              const { sku, shade, price } = parseCartKey(key);
+              const qty = cart[key];
+              return (
+                <div key={key} className="flex items-center justify-between py-2 border-b border-stone-200">
+                  <div>
+                    <span className="font-medium">{shade}</span>
+                    <span className="ml-2 text-xs text-stone-500 font-mono">{sku}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono font-bold">{qty} พับ</div>
+                    {price ? <div className="text-xs text-stone-500">฿{price}/kg</div> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">จุดหมาย · Destination</label>
+            <select
+              value={destination}
+              onChange={e => setDestination(e.target.value)}
+              className="w-full border-2 border-stone-900 p-2 text-sm"
+              disabled={submitting}
+            >
+              <option value="">เลือกจุดหมาย</option>
+              <option value="คลอง 4">คลอง 4</option>
+              <option value="โรงงาน">โรงงาน</option>
+              <option value="อื่นๆ">อื่นๆ</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">ความเร่งด่วน · Urgency</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUrgency("normal")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "normal" ? "bg-stone-900 text-stone-50 border-stone-900" : "border-stone-300 hover:border-stone-900"}`}
+              >
+                ปกติ · Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setUrgency("urgent")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "urgent" ? "bg-amber-700 text-stone-50 border-amber-700" : "border-stone-300 hover:border-amber-700"}`}
+              >
+                เร่งด่วน · Urgent
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">หมายเหตุ · Note (ถ้ามี)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="เช่น ขอส่งก่อน 15.00 น."
+              className="w-full border-2 border-stone-900 p-3 text-sm h-20"
+              disabled={submitting}
+            />
+          </div>
+
+          {submitError && (
+            <div className="mb-4 border-2 border-red-700 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertTriangle size={18} strokeWidth={1.5} className="shrink-0 mt-0.5 text-red-700" />
+              <div>
+                <div className="font-semibold">ส่งคำสั่งซื้อไม่สำเร็จ</div>
+                <div className="font-mono text-xs mt-1">{submitError}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-3 border-2 border-stone-900 text-stone-900 font-semibold hover:bg-stone-900 hover:text-stone-50 transition disabled:opacity-50"
+            >
+              แก้ไข
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={!destination || submitting}
+              className="flex-1 py-3 bg-stone-900 text-stone-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 transition flex items-center justify-center gap-2"
+            >
+              {submitting ? (<><Loader size={16} className="animate-spin" /> กำลังส่ง</>) : (<>ส่งคำสั่งซื้อ<Send size={16} /></>)}
+            </button>
+          </div>
+
+          <div className="mt-4 text-center text-xs text-stone-500 font-mono">
+            รวม {totalRolls} พับ · {cartItems.length} รายการ
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── END OF FILE ───
