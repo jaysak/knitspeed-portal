@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useStock } from "./hooks/useStock";
 import { supabase } from "./lib/supabase";
+import { useCartSubmit, makeCartKey, parseCartKey } from "./hooks/useCart";
 
 // ─────────────────────────────────────────────────────────────
 // MOCK DATA — Orders only (Stock now comes from Supabase)
@@ -41,7 +42,7 @@ export default function KnitspeedPortal() {
   // Filter stock for search
   const filteredGroups = useMemo(() => {
     if (!stockGroups || !search.trim()) return stockGroups || [];
-    
+
     const q = search.toLowerCase();
     return stockGroups.map(group => ({
       ...group,
@@ -140,16 +141,16 @@ export default function KnitspeedPortal() {
       {/* ─── MAIN ─── */}
       <main className={`max-w-[1400px] mx-auto px-8 py-8 ${role === "customer" && cartCount > 0 && view === "stock" ? "pb-32" : ""}`}>
         {view === "stock" && (
-          <StockView 
-            role={role} 
-            search={search} 
-            setSearch={setSearch} 
+          <StockView
+            role={role}
+            search={search}
+            setSearch={setSearch}
             groups={filteredGroups}
             loading={stockLoading}
             error={stockError}
             refresh={refresh}
-            cart={cart} 
-            setCart={setCart} 
+            cart={cart}
+            setCart={setCart}
           />
         )}
         {view === "orders" && <OrdersView role={role} />}
@@ -195,7 +196,7 @@ export default function KnitspeedPortal() {
         </div>
       )}
 
-{showSendOrder && (
+      {showSendOrder && (
         <SendOrderModal
           cart={cart}
           setCart={setCart}
@@ -207,8 +208,8 @@ export default function KnitspeedPortal() {
             setTimeout(() => setOrderSent(false), 4000);
           }}
         />
-      )}      
-      
+      )}
+
       {orderSent && (
         <div className="fixed bottom-8 right-8 z-50 bg-emerald-700 text-white px-6 py-4 border-2 border-emerald-900 animate-slide-up">
           <div className="flex items-center gap-3">
@@ -249,7 +250,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
         <div className="text-red-900 font-semibold mb-2">ข้อผิดพลาดในการโหลดข้อมูล</div>
         <div className="text-red-700 text-sm mb-4">{error}</div>
         <div className="text-xs text-red-600 mb-4">ตรวจสอบการเชื่อมต่อ Supabase และ .env.local</div>
-        <button 
+        <button
           onClick={refresh}
           className="px-4 py-2 bg-red-700 text-white text-sm font-medium hover:bg-red-800 transition"
         >
@@ -265,7 +266,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
         <Package size={32} className="mx-auto mb-4 text-stone-300" />
         <div>ไม่พบข้อมูลสต๊อก</div>
         <div className="text-xs font-mono text-stone-400 mt-1">No stock data found</div>
-        <button 
+        <button
           onClick={refresh}
           className="mt-4 px-4 py-2 border border-stone-300 text-stone-600 text-sm hover:border-stone-900 transition"
         >
@@ -329,7 +330,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
             <h2 className="font-display text-xl font-bold">สต๊อกปัจจุบัน · ข้อมูลจาก Supabase</h2>
             <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">Live Stock Data · Real-time from database</p>
           </div>
-          <button 
+          <button
             onClick={refresh}
             className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
           >
@@ -381,10 +382,9 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <th rowSpan={2} className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 border-r border-stone-200 align-middle">
                           สี · Shade
                         </th>
-                                      <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-red-700 bg-stone-100 border-r border-stone-200 align-middle">
+                        <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-red-700 bg-stone-100 border-r border-stone-200 align-middle">
                           ฿/kg
                         </th>
-
                         <th rowSpan={2} className="text-left py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 border-r-2 border-stone-900 align-middle">
                           รหัสสี · Code
                         </th>
@@ -394,7 +394,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <th colSpan={2} className="text-center py-1.5 px-3 text-xs font-semibold bg-rose-300 text-stone-900 border-r-2 border-stone-900">
                           อยู่โรงย้อม <span className="font-mono text-[10px] opacity-70 ml-1">· At dye-house</span>
                         </th>
-                        
+
                         {role === "customer" && (
                           <th rowSpan={2} className="text-right py-2 px-3 text-[11px] uppercase tracking-widest font-mono text-stone-600 bg-stone-100 align-middle">
                             เพิ่ม · Add
@@ -434,7 +434,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                               <div className="font-medium text-stone-900">{row.shade}</div>
                               <div className="text-[10px] text-stone-500 font-mono">ratio: {row.ratio || 'ok'}</div>
                             </td>
-                                                        {/* Price column — Gift's red convention */}
+                            {/* Price column — Gift's red convention */}
                             <td className="py-2.5 px-3 text-right font-mono tabular border-r border-stone-200">
                               {row.price_per_kg ? (
                                 <span className="text-base font-bold text-red-700">฿{row.price_per_kg}</span>
@@ -442,7 +442,6 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                                 <span className="text-stone-300">—</span>
                               )}
                             </td>
-
                             {/* Code column */}
                             <td className="py-2.5 px-3 font-mono text-xs text-stone-600 border-r-2 border-stone-900">
                               {row.code}
@@ -479,8 +478,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                                 <span className="text-stone-300">—</span>
                               )}
                             </td>
-                            {/* Price column */}
-                            
+
                             {/* Add to cart column */}
                             {role === "customer" && (
                               <td className="py-2.5 px-3 text-right">
@@ -512,7 +510,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                           </tr>
                         );
                       })}
-                      
+
                       {/* Totals row */}
                       <tr className="border-t-2 border-stone-900 bg-stone-100 font-mono text-xs">
                         <td className="py-2.5 px-3 font-semibold border-r border-stone-200">รวม · Total</td>
@@ -523,7 +521,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                         <td className="py-2.5 px-3 text-right font-bold border-r-2 border-stone-900">{readyRibTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50">{dyeFabTotal}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-rose-700 bg-rose-50 border-r-2 border-stone-900">{dyeRibTotal}</td>
-                        
+
                         {role === "customer" && <td className="py-2.5 px-3"></td>}
                       </tr>
                     </tbody>
@@ -569,7 +567,7 @@ function OrdersView({ role }) {
                   order.status === "partial" ? "bg-amber-500" : "bg-stone-400"
                 }`}></div>
                 <span className="text-xs font-mono uppercase tracking-widest">
-                  {order.status === "shipped" ? "ส่งแล้ว" : 
+                  {order.status === "shipped" ? "ส่งแล้ว" :
                    order.status === "partial" ? "บางส่วน" : "รอ"}
                 </span>
               </div>
@@ -606,15 +604,14 @@ function AdminView() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [editing, setEditing] = useState(null); // row being edited
-  const [saveToast, setSaveToast] = useState(null); // "success" | "error" | null
+  const [editing, setEditing] = useState(null);
+  const [saveToast, setSaveToast] = useState(null);
 
   const fetchRows = async () => {
     try {
       setLoading(true);
       setError(null);
-      //const { supabase } = await import('../lib/supabase'); sofia asked 
-      
+
       const { data, error: err } = await supabase
         .from('stock')
         .select('*')
@@ -635,7 +632,6 @@ function AdminView() {
 
   const handleSave = async (updated) => {
     try {
-      //const { supabase } = await import('../lib/supabase'); sofia asked
       const { error: err } = await supabase
         .from('stock')
         .update({
@@ -923,7 +919,7 @@ function OCRView() {
           </p>
         </div>
       </div>
-      
+
       <div className="border-2 border-stone-900 bg-stone-50 p-8 text-center">
         <Camera size={32} className="mx-auto mb-4 text-stone-600" />
         <div className="text-stone-900 font-semibold mb-2">OCR view - parked until production integration</div>
@@ -947,44 +943,58 @@ function KPI({ labelTh, labelEn, value, unit, bordered = false, alert = false })
 function SendOrderModal({ cart, setCart, onClose, onSent }) {
   const [destination, setDestination] = useState("");
   const [note, setNote] = useState("");
-  
+  const [urgency, setUrgency] = useState("normal");
+  const { submit, submitting, submitError } = useCartSubmit();
+
   const cartItems = Object.keys(cart).filter(k => cart[k] > 0);
   const totalRolls = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
+
+  const handleSend = async () => {
+    try {
+      const orderRef = await submit({ cart, destination, urgency, notes: note });
+      onSent(orderRef);
+    } catch (err) {
+      // submitError shown inline, modal stays open
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white border-4 border-stone-900 max-w-2xl w-full max-h-[90vh] overflow-auto animate-slide-up">
         <div className="bg-stone-900 text-stone-50 p-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-bold">ตรวจสอบคำสั่งซื้อ · Review Order</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-50"><X size={20} /></button>
+          <button onClick={onClose} disabled={submitting} className="text-stone-400 hover:text-stone-50 disabled:opacity-50">
+            <X size={20} />
+          </button>
         </div>
-        
+
         <div className="p-6">
           <div className="space-y-4 mb-6">
             {cartItems.map(key => {
-              const [groupId, shade, price] = key.split('__');
+              const { sku, shade, price } = parseCartKey(key);
               const qty = cart[key];
               return (
                 <div key={key} className="flex items-center justify-between py-2 border-b border-stone-200">
                   <div>
                     <span className="font-medium">{shade}</span>
-                    <span className="ml-2 text-xs text-stone-500 font-mono">{groupId.toUpperCase()}</span>
+                    <span className="ml-2 text-xs text-stone-500 font-mono">{sku}</span>
                   </div>
                   <div className="text-right">
                     <div className="font-mono font-bold">{qty} พับ</div>
-                    <div className="text-xs text-stone-500">฿{price}/kg</div>
+                    {price ? <div className="text-xs text-stone-500">฿{price}/kg</div> : null}
                   </div>
                 </div>
               );
             })}
           </div>
-          
-          <div className="mb-6">
+
+          <div className="mb-4">
             <label className="block text-sm font-medium mb-2">จุดหมาย · Destination</label>
-            <select 
+            <select
               value={destination}
               onChange={e => setDestination(e.target.value)}
               className="w-full border-2 border-stone-900 p-2 text-sm"
+              disabled={submitting}
             >
               <option value="">เลือกจุดหมาย</option>
               <option value="คลอง 4">คลอง 4</option>
@@ -992,7 +1002,29 @@ function SendOrderModal({ cart, setCart, onClose, onSent }) {
               <option value="อื่นๆ">อื่นๆ</option>
             </select>
           </div>
-          
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">ความเร่งด่วน · Urgency</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUrgency("normal")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "normal" ? "bg-stone-900 text-stone-50 border-stone-900" : "border-stone-300 hover:border-stone-900"}`}
+              >
+                ปกติ · Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setUrgency("urgent")}
+                disabled={submitting}
+                className={`flex-1 py-2 text-sm border-2 transition ${urgency === "urgent" ? "bg-amber-700 text-stone-50 border-amber-700" : "border-stone-300 hover:border-amber-700"}`}
+              >
+                เร่งด่วน · Urgent
+              </button>
+            </div>
+          </div>
+
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2">หมายเหตุ · Note (ถ้ามี)</label>
             <textarea
@@ -1000,26 +1032,37 @@ function SendOrderModal({ cart, setCart, onClose, onSent }) {
               onChange={e => setNote(e.target.value)}
               placeholder="เช่น ขอส่งก่อน 15.00 น."
               className="w-full border-2 border-stone-900 p-3 text-sm h-20"
+              disabled={submitting}
             />
           </div>
-          
+
+          {submitError && (
+            <div className="mb-4 border-2 border-red-700 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertTriangle size={18} strokeWidth={1.5} className="shrink-0 mt-0.5 text-red-700" />
+              <div>
+                <div className="font-semibold">ส่งคำสั่งซื้อไม่สำเร็จ</div>
+                <div className="font-mono text-xs mt-1">{submitError}</div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
-            <button 
+            <button
               onClick={onClose}
-              className="flex-1 py-3 border-2 border-stone-900 text-stone-900 font-semibold hover:bg-stone-900 hover:text-stone-50 transition"
+              disabled={submitting}
+              className="flex-1 py-3 border-2 border-stone-900 text-stone-900 font-semibold hover:bg-stone-900 hover:text-stone-50 transition disabled:opacity-50"
             >
               แก้ไข
             </button>
-            <button 
-              onClick={onSent}
-              disabled={!destination}
+            <button
+              onClick={handleSend}
+              disabled={!destination || submitting}
               className="flex-1 py-3 bg-stone-900 text-stone-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-700 transition flex items-center justify-center gap-2"
             >
-              ส่งคำสั่งซื้อ
-              <Send size={16} />
+              {submitting ? (<><Loader size={16} className="animate-spin" /> กำลังส่ง</>) : (<>ส่งคำสั่งซื้อ<Send size={16} /></>)}
             </button>
           </div>
-          
+
           <div className="mt-4 text-center text-xs text-stone-500 font-mono">
             รวม {totalRolls} พับ · {cartItems.length} รายการ
           </div>
