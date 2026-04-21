@@ -6,7 +6,7 @@
 
 const STUB_SESSION = {
   role: 'customer',
-  customer_id: null,           // TODO: paste วัยรุ่นสกรีน's customers.id here before testing submit
+  customer_id: e541b17e-7a83-4fa0-8118-b707bd5ada35,           // TODO: paste วัยรุ่นสกรีน's customers.id here before testing submit
   display_name: 'วัยรุ่นสกรีน',
 };
 
