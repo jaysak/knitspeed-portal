@@ -48,6 +48,9 @@ export function useStock() {
           readyRib: ribItem?.ready_rolls || 0,
           dyeRolls: item.dye_rolls || 0,
           dyeRib: ribItem?.dye_rolls || 0,
+          // Rib identity exposed for independent cart key construction
+          ribSku: ribItem?.sku || null,
+          ribPrice: ribItem?.price_per_kg || 0,
           dateIn: item.created_at ? new Date(item.created_at).toLocaleDateString('th-TH') : null,
           note: item.note,
           ratio: item.ratio || 'ok'
