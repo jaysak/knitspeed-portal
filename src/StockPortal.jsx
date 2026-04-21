@@ -536,7 +536,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                     </thead>
                     <tbody>
                       {group.rows.map((row, i) => {
-                        const cartKey = `${group.id}__${row.shade}__${row.price_per_kg}`;
+                        const cartKey = makeCartKey(row.sku, row.shade, row.price_per_kg);
                         const inCart = cart[cartKey] || 0;
                         const hasStock = (row.readyRolls || 0) > 0;
 
