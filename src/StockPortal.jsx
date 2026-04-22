@@ -11,6 +11,7 @@ import { useSalesOrders } from "./hooks/useSalesOrders";
 import UserMenu from "./components/UserMenu";
 import StatusChip from "./components/StatusChip";
 import { updateItemStatus, getStatusMeta } from "./hooks/useOrderItemStatus";
+import AddStockModal from "./components/AddStockModal";
 
 // ─────────────────────────────────────────────────────────────
 // SHAREABLE STOCK-LINK (Item 6)
@@ -803,6 +804,7 @@ function AdminView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
   const [saveToast, setSaveToast] = useState(null);
 
   const fetchRows = async () => {
@@ -855,6 +857,13 @@ function AdminView() {
     }
   };
 
+  const handleAdd = async ({ count }) => {
+    setShowAdd(false);
+    setSaveToast(count === 2 ? 'added2' : 'added1');
+    await fetchRows();
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -883,19 +892,27 @@ function AdminView() {
             Click a row to edit · {rows.length} items
           </p>
         </div>
-        <button
-          onClick={fetchRows}
-          className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
-        >
-          รีเฟรช · Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="text-xs font-mono uppercase tracking-widest bg-stone-900 text-stone-50 hover:bg-stone-700 border-2 border-stone-900 px-3 py-1 transition"
+          >
+            + เพิ่มสต๊อก · Add Stock
+          </button>
+          <button
+            onClick={fetchRows}
+            className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
+          >
+            รีเฟรช · Refresh
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
         <div className="text-center py-16 text-stone-500">
           <Package size={32} className="mx-auto mb-4 text-stone-300" />
           <div>ไม่มีข้อมูลสต๊อก · No stock rows yet</div>
-          <div className="text-xs font-mono text-stone-400 mt-1">Add rows via SQL or v1.1 form (not built)</div>
+          <div className="text-xs font-mono text-stone-400 mt-1">Click + Add Stock to create the first SKU</div>
         </div>
       ) : (
         <div className="border-2 border-stone-900 bg-white overflow-x-auto">
@@ -952,16 +969,27 @@ function AdminView() {
         />
       )}
 
+      {showAdd && (
+        <AddStockModal
+          existingRows={rows}
+          onSave={handleAdd}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
+
       {saveToast && (
         <div className={`fixed bottom-8 right-8 z-50 px-6 py-4 border-2 animate-slide-up ${
-          saveToast === 'success'
+          (saveToast === 'success' || saveToast === 'added1' || saveToast === 'added2')
             ? 'bg-emerald-700 text-white border-emerald-900'
             : 'bg-red-700 text-white border-red-900'
         }`}>
           <div className="flex items-center gap-3">
-            {saveToast === 'success' ? <Check size={20} /> : <AlertTriangle size={20} />}
+            {(saveToast === 'success' || saveToast === 'added1' || saveToast === 'added2') ? <Check size={20} /> : <AlertTriangle size={20} />}
             <div className="font-semibold">
-              {saveToast === 'success' ? 'บันทึกแล้ว · Saved' : saveToast}
+              {saveToast === 'success' && 'บันทึกแล้ว · Saved'}
+              {saveToast === 'added1' && 'เพิ่มแล้ว · Added (1 row)'}
+              {saveToast === 'added2' && 'เพิ่มแล้ว · Added (2 rows)'}
+              {saveToast && !['success','added1','added2'].includes(saveToast) && saveToast}
             </div>
           </div>
         </div>
