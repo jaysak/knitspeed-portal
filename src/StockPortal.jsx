@@ -814,8 +814,8 @@ function AdminView() {
         .from('stock')
         .select('*')
         .order('group_id', { ascending: true })
-        .order('item_type', { ascending: true })
-        .order('shade', { ascending: true });
+        .order('shade', { ascending: true })
+        .order('item_type', { ascending: true });
       if (err) throw err;
       setRows(data || []);
     } catch (err) {
