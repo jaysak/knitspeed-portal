@@ -10,7 +10,6 @@ export function useSalesOrders() {
     try {
       setLoading(true)
       setError(null)
-
       const { data, error: fetchError } = await supabase
         .from('orders')
         .select(`
@@ -34,9 +33,7 @@ export function useSalesOrders() {
           )
         `)
         .order('created_at', { ascending: false })
-
       if (fetchError) throw fetchError
-
       const shaped = (data || []).map(o => ({
         id: o.id,
         order_ref: o.order_ref,
@@ -67,7 +64,6 @@ export function useSalesOrders() {
           (sum, it) => sum + (it.rolls_ordered || 0), 0
         )
       }))
-
       setOrders(shaped)
     } catch (err) {
       console.error('Error fetching sales orders:', err)
@@ -79,5 +75,31 @@ export function useSalesOrders() {
 
   useEffect(() => { fetchOrders() }, [])
 
-  return { orders, loading, error, refresh: fetchOrders }
+  // ─────────────────────────────────────────────────────────
+  // Item 2 — optimistic local patches.
+  // These mutate the in-memory orders array without re-fetching.
+  // Callers (StatusChip) wrap the DB write around them:
+  //   1. patchItemStatus(id, newStatus)     ← optimistic UI
+  //   2. await updateItemStatus(id, newStatus)
+  //   3. if error: patchItemStatus(id, oldStatus) ← rollback
+  //
+  // Note: this does NOT recompute the parent order.status. That's
+  // derived by a DB trigger (orders.status trigger from the v0.6.0
+  // pivot migration). A full refresh() picks up the authoritative
+  // aggregated value; between flips the parent chip may lag by one
+  // click, which is acceptable.
+  // ─────────────────────────────────────────────────────────
+  const patchItemStatus = (itemId, newStatus) => {
+    setOrders(prev => {
+      if (!prev) return prev
+      return prev.map(o => ({
+        ...o,
+        items: o.items.map(it =>
+          it.id === itemId ? { ...it, status: newStatus } : it
+        ),
+      }))
+    })
+  }
+
+  return { orders, loading, error, refresh: fetchOrders, patchItemStatus }
 }

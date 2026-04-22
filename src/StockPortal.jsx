@@ -9,6 +9,8 @@ import { supabase } from "./lib/supabase";
 import { useCartSubmit, makeCartKey, parseCartKey } from "./hooks/useCart";
 import { useSalesOrders } from "./hooks/useSalesOrders";
 import UserMenu from "./components/UserMenu";
+import StatusChip from "./components/StatusChip";
+import { updateItemStatus, getStatusMeta } from "./hooks/useOrderItemStatus";
 
 // ─────────────────────────────────────────────────────────────
 // SHAREABLE STOCK-LINK (Item 6)
@@ -603,7 +605,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
 // ─────────────────────────────────────────────────────────────
 
 function OrdersView({ role }) {
-  const { orders, loading, error, refresh } = useSalesOrders();
+  const { orders, loading, error, refresh, patchItemStatus } = useSalesOrders();
 
   const titleTh = role === "provider" ? "ใบสั่งขายเข้ามา" : "คำสั่งซื้อของคุณ";
   const titleEn = role === "provider" ? "Sales Orders Inbox" : "Your Orders";
@@ -662,27 +664,36 @@ function OrdersView({ role }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map(order => <OrderCard key={order.id} order={order} role={role} />)}
+          {orders.map(order => <OrderCard key={order.id} order={order} role={role} canEdit={role === "provider"} patchItemStatus={patchItemStatus} refresh={refresh} />)}
         </div>
       )}
     </div>
   );
 }
 
-function OrderCard({ order, role }) {
+function OrderCard({ order, role, canEdit, patchItemStatus, refresh }) {
   const [expanded, setExpanded] = useState(true);
 
   const statusColor =
-    order.status === "completed" || order.status === "shipped" ? "bg-emerald-500" :
-    order.status === "partial" || order.status === "confirmed" ? "bg-amber-500" :
+    order.status === "delivered" || order.status === "completed" || order.status === "shipped" ? "bg-emerald-600" :
+    order.status === "in_stock"  ? "bg-emerald-500" :
+    order.status === "partial"   || order.status === "confirmed" ? "bg-amber-500" :
+    order.status === "at_dyeing" ? "bg-rose-400" :
+    order.status === "raw_short" ? "bg-red-700" :
     order.status === "cancelled" ? "bg-stone-400" :
+    order.status === "ordered"   ? "bg-stone-500" :
     "bg-red-500";
 
   const statusLabel =
     order.status === "pending"   ? "รอดำเนินการ" :
+    order.status === "ordered"   ? "สั่งแล้ว" :
     order.status === "confirmed" ? "ยืนยันแล้ว" :
+    order.status === "at_dyeing" ? "อยู่โรงย้อม" :
+    order.status === "raw_short" ? "ด้ายขาด" :
+    order.status === "in_stock"  ? "พร้อมส่ง" :
     order.status === "partial"   ? "บางส่วน" :
     order.status === "shipped"   ? "ส่งแล้ว" :
+    order.status === "delivered" ? "ถึงลูกค้า" :
     order.status === "completed" ? "เสร็จสิ้น" :
     order.status === "cancelled" ? "ยกเลิก" :
     order.status;
@@ -734,15 +745,29 @@ function OrderCard({ order, role }) {
 
           <div className="grid gap-1.5">
             {order.items.map(item => {
-              const itemDot =
-                item.status === "ready" || item.status === "shipped" ? "bg-emerald-600" :
-                item.status === "partial" ? "bg-amber-500" :
-                "bg-red-700";
-
+              const handleStatusChange = async (nextStatus) => {
+                const prevStatus = item.status;
+                // Optimistic: flip local state first.
+                patchItemStatus(item.id, nextStatus);
+                const { error } = await updateItemStatus(item.id, nextStatus);
+                if (error) {
+                  // Rollback on failure.
+                  patchItemStatus(item.id, prevStatus);
+                  return { ok: false, error };
+                }
+                // Refresh so the parent order.status (DB-derived by trigger)
+                // catches up. Runs in background; doesn't block the chip.
+                refresh?.();
+                return { ok: true };
+              };
               return (
-                <div key={item.id} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-3 h-3 shrink-0 ${itemDot}`}></div>
+                <div key={item.id} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0 gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <StatusChip
+                      status={item.status}
+                      canEdit={canEdit}
+                      onChange={handleStatusChange}
+                    />
                     <div className="min-w-0">
                       <span className="font-medium">{item.shade}</span>
                       <span className="ml-2 text-xs text-stone-500 font-mono">{item.sku}</span>
@@ -751,7 +776,7 @@ function OrderCard({ order, role }) {
                       )}
                     </div>
                   </div>
-                  <div className="text-right shrink-0 ml-3">
+                  <div className="text-right shrink-0">
                     <div className="font-mono text-sm tabular">
                       {item.rolls} <span className="text-stone-400 text-xs">พับ</span>
                     </div>
