@@ -2,13 +2,63 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search, Package, Clock, AlertTriangle, Plus, ChevronRight, Eye, Edit3,
   Check, X, TrendingDown, Truck, FileText, Upload, Camera, Loader,
-  ArrowLeft, MapPin, Zap, Send, Scan
+  ArrowLeft, MapPin, Zap, Send, Scan, Link2, Copy, Check as CheckIcon
 } from "lucide-react";
 import { useStock } from "./hooks/useStock";
 import { supabase } from "./lib/supabase";
 import { useCartSubmit, makeCartKey, parseCartKey } from "./hooks/useCart";
 import { useSalesOrders } from "./hooks/useSalesOrders";
 import UserMenu from "./components/UserMenu";
+
+// ─────────────────────────────────────────────────────────────
+// SHAREABLE STOCK-LINK (Item 6)
+// ─────────────────────────────────────────────────────────────
+
+function CopyLinkButton({ sku }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}?sku=${encodeURIComponent(sku)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (err) {
+      // Fallback for older browsers: select a hidden textarea.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 1800); }
+      catch (e2) { console.error('Copy failed', e2); }
+      document.body.removeChild(ta);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition rounded"
+      title={`คัดลอกลิงก์ SKU ${sku}`}
+      aria-label={`คัดลอกลิงก์ SKU ${sku}`}
+    >
+      {copied ? (
+        <>
+          <CheckIcon size={11} strokeWidth={2} className="text-emerald-600" />
+          <span className="text-emerald-700">คัดลอกแล้ว</span>
+        </>
+      ) : (
+        <>
+          <Link2 size={11} strokeWidth={1.5} />
+          <span>ลิงก์</span>
+        </>
+      )}
+    </button>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -21,21 +71,56 @@ export default function KnitspeedPortal({ session }) {
   const [cart, setCart] = useState({});
   const [showSendOrder, setShowSendOrder] = useState(false);
   const [orderSent, setOrderSent] = useState(false);
+  const [skuFilter, setSkuFilter] = useState(null);
+  const [groupFilter, setGroupFilter] = useState(null);
+
+  // Item 6: read URL params on mount — ?sku= / ?q= / ?group=
+  // Used by Gift to share a stock link with customers via LINE.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sku = params.get('sku');
+    const q = params.get('q');
+    const group = params.get('group');
+    if (sku) setSkuFilter(sku);
+    if (q) setSearch(q);
+    if (group) setGroupFilter(group);
+  }, []);
+
+  const clearFilters = () => {
+    setSkuFilter(null);
+    setGroupFilter(null);
+    setSearch('');
+    // Also clear the URL so a refresh doesn't re-apply the filter.
+    if (window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  };
 
   const { groups: stockGroups, loading: stockLoading, error: stockError, refresh } = useStock();
 
   const filteredGroups = useMemo(() => {
-    if (!stockGroups || !search.trim()) return stockGroups || [];
-    const q = search.toLowerCase();
-    return stockGroups.map(group => ({
-      ...group,
-      rows: group.rows.filter(row =>
-        row.shade.toLowerCase().includes(q) ||
-        row.code.toLowerCase().includes(q) ||
-        group.title.toLowerCase().includes(q)
-      )
-    })).filter(group => group.rows.length > 0);
-  }, [stockGroups, search]);
+    if (!stockGroups) return [];
+    const q = search.trim().toLowerCase();
+    const hasAnyFilter = q || skuFilter || groupFilter;
+    if (!hasAnyFilter) return stockGroups;
+
+    return stockGroups
+      .filter(group => !groupFilter || group.id === groupFilter || group.title.toLowerCase().includes(groupFilter.toLowerCase()))
+      .map(group => ({
+        ...group,
+        rows: group.rows.filter(row => {
+          if (skuFilter && row.sku !== skuFilter && row.ribSku !== skuFilter) return false;
+          if (!q) return true;
+          return (
+            row.shade.toLowerCase().includes(q) ||
+            row.code.toLowerCase().includes(q) ||
+            (row.sku || '').toLowerCase().includes(q) ||
+            group.title.toLowerCase().includes(q)
+          );
+        })
+      }))
+      .filter(group => group.rows.length > 0);
+  }, [stockGroups, search, skuFilter, groupFilter]);
 
   const cartCount = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
   const cartItems = Object.keys(cart).filter(k => cart[k] > 0).length;
@@ -105,6 +190,9 @@ export default function KnitspeedPortal({ session }) {
           <StockView
             role={role}
             search={search}
+            skuFilter={skuFilter}
+            groupFilter={groupFilter}
+            clearFilters={clearFilters}
             setSearch={setSearch}
             groups={filteredGroups}
             loading={stockLoading}
@@ -188,7 +276,7 @@ export default function KnitspeedPortal({ session }) {
 // STOCK VIEW
 // ─────────────────────────────────────────────────────────────
 
-function StockView({ role, search, setSearch, groups, loading, error, refresh, cart, setCart }) {
+function StockView({ role, search, setSearch, groups, loading, error, refresh, cart, setCart, skuFilter, groupFilter, clearFilters }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -292,6 +380,23 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
           </button>
         </div>
 
+        {(skuFilter || groupFilter) && (
+          <div className="mb-4 border-2 border-amber-600 bg-amber-50 px-3 py-2 flex items-center justify-between text-xs">
+            <div className="font-mono">
+              <span className="uppercase tracking-widest text-amber-800">กรองอยู่ · Filtered:</span>{' '}
+              {skuFilter && <span className="font-bold text-stone-900">SKU {skuFilter}</span>}
+              {skuFilter && groupFilter && <span> · </span>}
+              {groupFilter && <span className="font-bold text-stone-900">กลุ่ม {groupFilter}</span>}
+            </div>
+            <button
+              onClick={clearFilters}
+              className="font-mono uppercase tracking-widest text-amber-800 hover:text-amber-900 underline"
+            >
+              ล้างตัวกรอง · Clear
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-0 mb-6 border-2 border-stone-900 bg-white text-xs">
           <div className="p-3 flex items-center gap-2">
             <div className="w-3 h-3 bg-stone-900"></div>
@@ -379,7 +484,10 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                             }`}
                           >
                             <td className="py-2.5 px-3 border-r border-stone-200">
-                              <div className="font-medium text-stone-900">{row.shade}</div>
+                              <div className="font-medium text-stone-900 flex items-center gap-2">
+                                <span>{row.shade}</span>
+                                <CopyLinkButton sku={row.sku} />
+                              </div>
                               <div className="text-[10px] text-stone-500 font-mono">ratio: {row.ratio || 'ok'}</div>
                             </td>
                             <td className="py-2.5 px-3 text-right font-mono tabular border-r border-stone-200">
