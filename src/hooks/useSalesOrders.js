@@ -56,6 +56,8 @@ export function useSalesOrders() {
           shade: it.shade,
           rolls: it.rolls_ordered || 0,
           kg: it.kg_ordered || 0,
+          rolls_ordered: it.rolls_ordered,
+          kg_ordered: it.kg_ordered,
           price_per_kg: it.price_per_kg || 0,
           status: it.status,
           note: it.note
@@ -101,5 +103,33 @@ export function useSalesOrders() {
     })
   }
 
-  return { orders, loading, error, refresh: fetchOrders, patchItemStatus }
+  // ─────────────────────────────────────────────────────────
+  // Optimistic qty patcher — Item 3c.
+  // Accepts a partial patch { rolls_ordered?, kg_ordered? }.
+  // Also updates display fallbacks (rolls, kg). Does NOT
+  // recompute total_rolls; refresh() picks up the aggregated
+  // value after the DB write lands.
+  // ─────────────────────────────────────────────────────────
+  const patchItemQty = (itemId, patch) => {
+    setOrders(prev => {
+      if (!prev) return prev
+      return prev.map(o => ({
+        ...o,
+        items: o.items.map(it => {
+          if (it.id !== itemId) return it
+          const nextRolls = 'rolls_ordered' in patch ? patch.rolls_ordered : it.rolls_ordered
+          const nextKg    = 'kg_ordered'    in patch ? patch.kg_ordered    : it.kg_ordered
+          return {
+            ...it,
+            rolls_ordered: nextRolls,
+            kg_ordered: nextKg,
+            rolls: nextRolls || 0,
+            kg: nextKg || 0,
+          }
+        }),
+      }))
+    })
+  }
+
+  return { orders, loading, error, refresh: fetchOrders, patchItemStatus, patchItemQty }
 }

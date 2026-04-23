@@ -11,7 +11,9 @@ import { useSalesOrders } from "./hooks/useSalesOrders";
 import UserMenu from "./components/UserMenu";
 import StatusChip from "./components/StatusChip";
 import { updateItemStatus, getStatusMeta } from "./hooks/useOrderItemStatus";
+import { isStatusEditable } from "./hooks/useOrderItemQuantity";
 import AddStockModal from "./components/AddStockModal";
+import OrderItemQtyEditModal from "./components/OrderItemQtyEditModal";
 
 // ─────────────────────────────────────────────────────────────
 // SHAREABLE STOCK-LINK (Item 6)
@@ -606,7 +608,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
 // ─────────────────────────────────────────────────────────────
 
 function OrdersView({ role }) {
-  const { orders, loading, error, refresh, patchItemStatus } = useSalesOrders();
+  const { orders, loading, error, refresh, patchItemStatus, patchItemQty } = useSalesOrders();
 
   const titleTh = role === "provider" ? "ใบสั่งขายเข้ามา" : "คำสั่งซื้อของคุณ";
   const titleEn = role === "provider" ? "Sales Orders Inbox" : "Your Orders";
@@ -665,15 +667,16 @@ function OrdersView({ role }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map(order => <OrderCard key={order.id} order={order} role={role} canEdit={role === "provider"} patchItemStatus={patchItemStatus} refresh={refresh} />)}
+          {orders.map(order => <OrderCard key={order.id} order={order} role={role} canEdit={role === "provider"} patchItemStatus={patchItemStatus} patchItemQty={patchItemQty} refresh={refresh} />)}
         </div>
       )}
     </div>
   );
 }
 
-function OrderCard({ order, role, canEdit, patchItemStatus, refresh }) {
+function OrderCard({ order, role, canEdit, patchItemStatus, patchItemQty, refresh }) {
   const [expanded, setExpanded] = useState(true);
+  const [qtyEditItem, setQtyEditItem] = useState(null);
 
   const statusColor =
     order.status === "delivered" || order.status === "completed" || order.status === "shipped" ? "bg-emerald-600" :
@@ -727,6 +730,21 @@ function OrderCard({ order, role, canEdit, patchItemStatus, refresh }) {
         </div>
       </button>
 
+      {qtyEditItem && (
+        <OrderItemQtyEditModal
+          item={qtyEditItem}
+          orderRef={order.order_ref}
+          onClose={() => setQtyEditItem(null)}
+          onSaved={(patch) => {
+            patchItemQty?.(qtyEditItem.id, {
+              rolls_ordered: patch.rolls_ordered,
+              kg_ordered: patch.kg_ordered,
+            });
+            setQtyEditItem(null);
+            refresh?.();
+          }}
+        />
+      )}
       {expanded && (
         <div className="p-4">
           <div className="flex items-center gap-6 mb-3 text-xs font-mono text-stone-600 uppercase tracking-widest">
@@ -777,13 +795,33 @@ function OrderCard({ order, role, canEdit, patchItemStatus, refresh }) {
                       )}
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono text-sm tabular">
-                      {item.rolls} <span className="text-stone-400 text-xs">พับ</span>
-                    </div>
-                    {item.price_per_kg ? (
-                      <div className="text-[10px] text-stone-500 font-mono">฿{item.price_per_kg}/kg</div>
-                    ) : null}
+                  <div className="text-right shrink-0 group/qty relative">
+                    {canEdit && isStatusEditable(item.status) ? (
+                      <button
+                        onClick={() => setQtyEditItem(item)}
+                        className="text-right hover:bg-stone-100 active:bg-stone-200 transition px-2 py-0.5 -mx-2 -my-0.5 border border-transparent hover:border-stone-300"
+                        title="แก้จำนวน · Edit quantity"
+                      >
+                        <div className="font-mono text-sm tabular">
+                          {item.rolls} <span className="text-stone-400 text-xs">พับ</span>
+                          {item.kg ? <span className="text-stone-400 text-xs ml-1">· {item.kg}kg</span> : null}
+                          <span className="ml-1.5 text-stone-400 text-[10px] md:opacity-0 md:group-hover/qty:opacity-100 md:transition">✎</span>
+                        </div>
+                        {item.price_per_kg ? (
+                          <div className="text-[10px] text-stone-500 font-mono">฿{item.price_per_kg}/kg</div>
+                        ) : null}
+                      </button>
+                    ) : (
+                      <>
+                        <div className="font-mono text-sm tabular">
+                          {item.rolls} <span className="text-stone-400 text-xs">พับ</span>
+                          {item.kg ? <span className="text-stone-400 text-xs ml-1">· {item.kg}kg</span> : null}
+                        </div>
+                        {item.price_per_kg ? (
+                          <div className="text-[10px] text-stone-500 font-mono">฿{item.price_per_kg}/kg</div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </div>
               );
