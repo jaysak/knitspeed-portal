@@ -4,10 +4,13 @@
 //   loading   → spinner
 //   no user   → <LoginForm />
 //   signed in → <KnitspeedPortal session={session} />
+//
+// v0.7.4: ToastProvider wraps everything so any descendant can call useToast().
 
 import { useSession } from './lib/session';
 import LoginForm from './components/LoginForm';
 import KnitspeedPortal from './StockPortal.jsx';
+import ToastProvider from './components/ToastProvider';
 
 export default function App() {
   const session = useSession();
@@ -20,11 +23,11 @@ export default function App() {
     );
   }
 
-  if (!session.userId) {
-    return <LoginForm />;
-  }
-
-  return <KnitspeedPortal session={session} />;
+  return (
+    <ToastProvider>
+      {!session.userId ? <LoginForm /> : <KnitspeedPortal session={session} />}
+    </ToastProvider>
+  );
 }
 
 const loadingStyle = {

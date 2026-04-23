@@ -69,15 +69,15 @@ export default function AddStockModal({ existingRows, onSave, onClose }) {
   // ── effective values ──────────────────────────────────────
   const effectiveGroup = groupMode === 'new' ? newGroupId.trim() : groupId;
 
-  // Auto-fill width from group typical when group changes (don't clobber user input)
+  // Auto-fill width from group typical on group-or-type change.
+  // Always sets to the correct per-type default — type-change should reflect
+  // the typical width for that type (v0.7.4 fix).
   useEffect(() => {
     if (!effectiveGroup) return;
     const w = groupWidths[effectiveGroup];
     if (!w) return;
-    if (widthInches === '') {
-      const def = itemType === 'fabric' ? w.fabric : w.rib;
-      if (def != null) setWidthInches(String(def));
-    }
+    const def = itemType === 'fabric' ? w.fabric : w.rib;
+    if (def != null) setWidthInches(String(def));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveGroup, itemType]);
 
@@ -283,7 +283,7 @@ export default function AddStockModal({ existingRows, onSave, onClose }) {
                   type="text"
                   placeholder="e.g. 30CM"
                   value={newGroupId}
-                  onChange={e => setNewGroupId(e.target.value.toUpperCase())}
+                  onChange={e => setNewGroupId(e.target.value.toLowerCase())}
                   className="flex-1 border-2 border-stone-900 p-2 font-mono text-sm"
                 />
               )}

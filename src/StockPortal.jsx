@@ -14,6 +14,7 @@ import { updateItemStatus, getStatusMeta } from "./hooks/useOrderItemStatus";
 import { isStatusEditable } from "./hooks/useOrderItemQuantity";
 import AddStockModal from "./components/AddStockModal";
 import OrderItemQtyEditModal from "./components/OrderItemQtyEditModal";
+import { useToast } from "./components/ToastProvider";
 
 // ─────────────────────────────────────────────────────────────
 // SHAREABLE STOCK-LINK (Item 6)
@@ -677,6 +678,7 @@ function OrdersView({ role }) {
 function OrderCard({ order, role, canEdit, patchItemStatus, patchItemQty, refresh }) {
   const [expanded, setExpanded] = useState(true);
   const [qtyEditItem, setQtyEditItem] = useState(null);
+  const toast = useToast();
 
   const statusColor =
     order.status === "delivered" || order.status === "completed" || order.status === "shipped" ? "bg-emerald-600" :
@@ -742,6 +744,7 @@ function OrderCard({ order, role, canEdit, patchItemStatus, patchItemQty, refres
             });
             setQtyEditItem(null);
             refresh?.();
+            toast?.showToast?.('บันทึกจำนวนแล้ว · Quantity saved', 'success');
           }}
         />
       )}
@@ -777,6 +780,7 @@ function OrderCard({ order, role, canEdit, patchItemStatus, patchItemQty, refres
                 // Refresh so the parent order.status (DB-derived by trigger)
                 // catches up. Runs in background; doesn't block the chip.
                 refresh?.();
+                toast?.showToast?.('เปลี่ยนสถานะแล้ว · Status updated', 'success');
                 return { ok: true };
               };
               return (
