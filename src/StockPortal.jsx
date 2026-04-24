@@ -5,6 +5,11 @@ import {
   ArrowLeft, MapPin, Zap, Send, Scan, Link2, Copy, Check as CheckIcon
 } from "lucide-react";
 import { useStock } from "./hooks/useStock";
+
+// v0.7.8: low-stock threshold (fabric only).
+// When 0 < readyRolls < this value, the number renders in amber to cue
+// Gift (and customers browsing) that supply is thin. Tune in one place.
+const LOW_STOCK_THRESHOLD_ROLLS = 3;
 import { supabase } from "./lib/supabase";
 import { useCartSubmit, makeCartKey, parseCartKey } from "./hooks/useCart";
 import { useSalesOrders } from "./hooks/useSalesOrders";
@@ -517,7 +522,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                                     className="w-6 h-6 text-xs font-bold disabled:opacity-30 border border-stone-300 hover:border-stone-900 transition"
                                   >−</button>
                                   <span className="min-w-[3rem] text-right tabular">
-                                    <span className="text-base font-semibold text-stone-900">{row.readyRolls}</span>
+                                    <span className={`text-base font-semibold ${row.readyRolls > 0 && row.readyRolls < LOW_STOCK_THRESHOLD_ROLLS ? "text-amber-700" : "text-stone-900"}`}>{row.readyRolls}</span>
                                     {fabricInCart > 0 && (
                                       <span className="ml-1 text-[10px] text-amber-700 font-bold">+{fabricInCart}</span>
                                     )}
@@ -529,7 +534,7 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
                                   >+</button>
                                 </div>
                               ) : (row.readyRolls || 0) > 0 ? (
-                                <span className="text-base font-semibold">{row.readyRolls}</span>
+                                <span className={`text-base font-semibold ${row.readyRolls < LOW_STOCK_THRESHOLD_ROLLS ? "text-amber-700" : ""}`}>{row.readyRolls}</span>
                               ) : (
                                 <span className="text-stone-300">—</span>
                               )}
