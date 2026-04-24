@@ -611,6 +611,23 @@ function StockView({ role, search, setSearch, groups, loading, error, refresh, c
 function OrdersView({ role }) {
   const { orders, loading, error, refresh, patchItemStatus, patchItemQty } = useSalesOrders();
 
+  // ── v0.7.6: filter + search state ────────────────────────────
+  // MUST be declared BEFORE any early-return guards (Rules of Hooks).
+  // Chip filter (customer only). Provider keeps unfiltered view.
+  //   'all'       — no status filter
+  //   'active'    — pending, confirmed, partial
+  //   'shipped'   — shipped
+  //   'completed' — completed, cancelled
+  const [statusChip, setStatusChip] = useState('all');
+
+  // Search (both roles). Debounced 200ms via useDeferredValue-style pattern.
+  const [searchRaw, setSearchRaw] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQ(searchRaw.trim().toLowerCase()), 200);
+    return () => clearTimeout(t);
+  }, [searchRaw]);
+
   const titleTh = role === "provider" ? "ใบสั่งขายเข้ามา" : "คำสั่งซื้อของคุณ";
   const titleEn = role === "provider" ? "Sales Orders Inbox" : "Your Orders";
   const subEn   = role === "provider"
@@ -645,16 +662,93 @@ function OrdersView({ role }) {
     );
   }
 
+  const chipMatch = (status) => {
+    if (statusChip === 'all') return true;
+    if (statusChip === 'active')    return ['pending', 'confirmed', 'partial'].includes(status);
+    if (statusChip === 'shipped')   return status === 'shipped';
+    if (statusChip === 'completed') return ['completed', 'cancelled'].includes(status);
+    return true;
+  };
+
+  const searchMatch = (order) => {
+    if (!searchQ) return true;
+    if ((order.order_ref || '').toLowerCase().includes(searchQ)) return true;
+    return (order.items || []).some(it =>
+      (it.shade || '').toLowerCase().includes(searchQ) ||
+      (it.sku   || '').toLowerCase().includes(searchQ)
+    );
+  };
+
+  const filteredOrders = (orders || []).filter(o =>
+    (role === 'provider' ? true : chipMatch(o.status)) && searchMatch(o)
+  );
+
+  const hasFiltersActive = statusChip !== 'all' || searchQ.length > 0;
+
+  const clearFilters = () => {
+    setStatusChip('all');
+    setSearchRaw('');
+    setSearchQ('');
+  };
+
+  const ChipButton = ({ value, th, en }) => {
+    const active = statusChip === value;
+    return (
+      <button
+        onClick={() => setStatusChip(value)}
+        className={`px-3 py-1.5 text-xs font-mono uppercase tracking-widest border transition ${
+          active
+            ? 'bg-stone-900 text-stone-50 border-stone-900'
+            : 'bg-white text-stone-600 border-stone-300 hover:border-stone-900'
+        }`}
+      >
+        {th} · {en}
+      </button>
+    );
+  };
+
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-6 pb-3 border-b-2 border-stone-900">
-        <div>
-          <h2 className="font-display text-xl font-bold">{titleTh} · {titleEn}</h2>
-          <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">{subEn}</p>
+      <div className="mb-4 pb-3 border-b-2 border-stone-900">
+        <h2 className="font-display text-xl font-bold">{titleTh} · {titleEn}</h2>
+        <p className="text-xs font-mono text-stone-500 uppercase tracking-widest">{subEn}</p>
+      </div>
+
+      {/* v0.7.6: controls row — chips (customer only) + search + refresh */}
+      <div className="flex items-center gap-2 flex-wrap mb-6">
+        {role !== 'provider' && (
+          <div className="flex gap-1">
+            <ChipButton value="all"       th="ทั้งหมด"        en="All" />
+            <ChipButton value="active"    th="กำลังดำเนินการ"  en="Active" />
+            <ChipButton value="shipped"   th="จัดส่งแล้ว"      en="Shipped" />
+            <ChipButton value="completed" th="เสร็จสิ้น"        en="Completed" />
+          </div>
+        )}
+
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            value={searchRaw}
+            onChange={e => setSearchRaw(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setSearchRaw(''); setSearchQ(''); } }}
+            placeholder="ค้นหา order / shade / SKU"
+            className="w-full pl-8 pr-8 py-1.5 text-sm border border-stone-300 focus:border-stone-900 outline-none transition"
+          />
+          {searchRaw && (
+            <button
+              onClick={() => { setSearchRaw(''); setSearchQ(''); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-900"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
+
         <button
           onClick={refresh}
-          className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1 transition"
+          className="text-xs font-mono uppercase tracking-widest text-stone-500 hover:text-stone-900 border border-stone-300 hover:border-stone-900 px-3 py-1.5 transition"
         >
           รีเฟรช · Refresh
         </button>
@@ -666,9 +760,23 @@ function OrdersView({ role }) {
           <div>ยังไม่มีคำสั่งซื้อ</div>
           <div className="text-xs font-mono text-stone-400 mt-1">No orders yet</div>
         </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="text-center py-16 text-stone-500">
+          <Search size={32} className="mx-auto mb-4 text-stone-300" />
+          <div>ไม่พบคำสั่งซื้อตามที่ค้นหา</div>
+          <div className="text-xs font-mono text-stone-400 mt-1 mb-4">No matching orders</div>
+          {hasFiltersActive && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 border border-stone-300 text-stone-600 text-sm hover:border-stone-900 transition"
+            >
+              ล้างตัวกรอง · Clear filters
+            </button>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
-          {orders.map(order => <OrderCard key={order.id} order={order} role={role} canEdit={role === "provider"} patchItemStatus={patchItemStatus} patchItemQty={patchItemQty} refresh={refresh} />)}
+          {filteredOrders.map(order => <OrderCard key={order.id} order={order} role={role} canEdit={role === "provider"} patchItemStatus={patchItemStatus} patchItemQty={patchItemQty} refresh={refresh} />)}
         </div>
       )}
     </div>
